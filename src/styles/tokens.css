@@ -1,0 +1,132 @@
+/*
+ * Design tokens.
+ *
+ * The visual rules, stated once so they stay consistent:
+ *
+ * - **No accent colour.** The primary action is ink-on-light / paper-on-dark.
+ *   A single saturated accent is the fastest way to make a utility look like a
+ *   toy; the restraint is deliberate.
+ * - **Warm neutrals.** Slightly warm greys read as paper rather than as the
+ *   blue-grey of default Tailwind ramps, which is most of what "premium" means
+ *   in a text-heavy UI.
+ * - **Two-layer shadows.** A tight shadow for the contact edge plus a wide,
+ *   very low-alpha one for depth. Single hard shadows look cheap.
+ * - **Motion is short and decisive.** Durations are 120-320ms with an
+ *   exponential-out curve. Nothing bounces, nothing exceeds 320ms.
+ */
+
+:root {
+  /* --- Neutral ramp (light) --------------------------------------------- */
+  --paper: 0 0% 100%;
+  --canvas: 40 20% 99%;
+  --surface: 40 16% 97.5%;
+  --surface-hover: 40 14% 95.5%;
+  --surface-active: 40 13% 93%;
+
+  --line: 40 12% 90%;
+  --line-strong: 40 10% 84%;
+
+  --ink: 30 8% 11%;
+  --ink-soft: 30 6% 34%;
+  --ink-muted: 30 5% 52%;
+  --ink-faint: 30 4% 68%;
+
+  /* --- Semantics --------------------------------------------------------- */
+  --primary: 30 8% 11%;
+  --primary-ink: 40 20% 99%;
+  --danger: 4 62% 47%;
+  --success: 148 42% 38%;
+  --working: 38 80% 48%;
+
+  /* --- Shapes ------------------------------------------------------------ */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  /* --- Elevation --------------------------------------------------------- */
+  --shadow-hairline: 0 0 0 1px hsl(var(--line));
+  --shadow-raised:
+    0 1px 1px hsl(30 10% 10% / 0.04),
+    0 4px 12px -2px hsl(30 10% 10% / 0.06);
+  --shadow-overlay:
+    0 1px 2px hsl(30 10% 10% / 0.05),
+    0 12px 32px -4px hsl(30 10% 10% / 0.13),
+    0 32px 64px -16px hsl(30 10% 10% / 0.1);
+
+  /* --- Motion ------------------------------------------------------------ */
+  --dur-instant: 120ms;
+  --dur-fast: 180ms;
+  --dur-base: 240ms;
+  --dur-slow: 320ms;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* --- Typography -------------------------------------------------------- */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-serif:
+    'Songti SC', 'Source Han Serif SC', 'Noto Serif CJK SC', Georgia, serif;
+  --font-mono:
+    'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 11.5px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --text-display: 30px;
+
+  --leading-tight: 1.35;
+  --leading-normal: 1.55;
+  /* Generous: the body copy is the product, and CJK needs more air than Latin. */
+  --leading-relaxed: 1.75;
+}
+
+.dark {
+  --paper: 30 6% 11%;
+  --canvas: 30 6% 9%;
+  --surface: 30 5% 14%;
+  --surface-hover: 30 5% 17%;
+  --surface-active: 30 5% 20%;
+
+  --line: 30 5% 21%;
+  --line-strong: 30 5% 28%;
+
+  --ink: 40 14% 94%;
+  --ink-soft: 40 8% 76%;
+  --ink-muted: 40 6% 60%;
+  --ink-faint: 40 5% 44%;
+
+  --primary: 40 16% 95%;
+  --primary-ink: 30 7% 10%;
+  --danger: 4 58% 60%;
+  --success: 148 38% 52%;
+  --working: 38 72% 58%;
+
+  --shadow-raised:
+    0 1px 1px hsl(0 0% 0% / 0.2),
+    0 4px 12px -2px hsl(0 0% 0% / 0.3);
+  --shadow-overlay:
+    0 1px 2px hsl(0 0% 0% / 0.3),
+    0 12px 32px -4px hsl(0 0% 0% / 0.5),
+    0 32px 64px -16px hsl(0 0% 0% / 0.4);
+}
+
+/*
+ * Respect the system preference. A streaming chat is exactly the kind of surface
+ * where a large slide-in becomes unpleasant, so every non-essential transition
+ * collapses rather than merely speeding up.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

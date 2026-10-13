@@ -1,0 +1,59 @@
+{
+  "$comment": [
+    "Example script for `MOCK_SCRIPT=scripts/mock-script.example.json node scripts/mock-llm.mjs`.",
+    "A streaming request is matched against the LAST user message: the first entry whose",
+    "`match` is a substring of it wins (an empty `match` is the catch-all). Within an entry",
+    "the reply is picked by the model's base id — flags stripped — falling back to `*`.",
+    "`cps` paces the answer in characters per second; `reasoningCps` does the same for the",
+    "thinking chain, which streams first. `query`/`searchMs` drive the hosted-search step,",
+    "and `sources` replace the built-in citations. Top-level `probeMs` only slows the model",
+    "health check, which is handy when the settings screen is being looked at."
+  ],
+  "probeMs": 240,
+  "entries": [
+    {
+      "match": "explain the tradeoff",
+      "replies": {
+        "claude-opus-5-5": {
+          "cps": 55,
+          "text": "The tradeoff is where the complexity lives: **in the data model**, or in every message that has to branch on it.\n\nPut it in the model and the interface stays a straight line."
+        },
+        "*": {
+          "cps": 90,
+          "text": "Short answer: the data model.\n\nEverything downstream then has one shape to read."
+        }
+      }
+    },
+    {
+      "match": "how many folds",
+      "replies": {
+        "*": {
+          "cps": 60,
+          "reasoningCps": 120,
+          "reasoning": "Paper is about 0.1 mm thick and doubles with every fold.\nThe Moon is 384,400 km away, so 0.1 × 2ⁿ must exceed 3.84 × 10¹¹ mm.\nThat puts n at 42.",
+          "text": "**42 folds.**\n\nThe 42nd fold alone adds more than all the ones before it — that is what exponential growth looks like."
+        }
+      }
+    },
+    {
+      "match": "compare the two",
+      "sources": [
+        { "url": "https://example.com/a", "title": "Background reading" }
+      ],
+      "replies": {
+        "*": {
+          "cps": 70,
+          "query": "the two options, compared",
+          "searchMs": 900,
+          "text": "The difference comes down to what each one bundles.\n\nOne ships its own engine; the other uses the one already on the machine."
+        }
+      }
+    },
+    {
+      "match": "",
+      "replies": {
+        "*": { "cps": 400, "text": "好的，我们从最关键的部分开始。" }
+      }
+    }
+  ]
+}

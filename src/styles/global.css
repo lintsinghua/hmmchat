@@ -1,0 +1,371 @@
+@import 'tailwindcss';
+@import './tokens.css';
+@import './markdown.css';
+
+/*
+ * Tailwind v4 theme bridge: expose the token CSS variables as utility names so
+ * components can write `bg-surface`, `text-ink-muted`, `duration-240` and so on
+ * without hard-coding colour values anywhere.
+ */
+@theme inline {
+  --color-paper: hsl(var(--paper));
+  --color-canvas: hsl(var(--canvas));
+  --color-surface: hsl(var(--surface));
+  --color-surface-hover: hsl(var(--surface-hover));
+  --color-surface-active: hsl(var(--surface-active));
+
+  --color-line: hsl(var(--line));
+  --color-line-strong: hsl(var(--line-strong));
+
+  --color-ink: hsl(var(--ink));
+  --color-ink-soft: hsl(var(--ink-soft));
+  --color-ink-muted: hsl(var(--ink-muted));
+  --color-ink-faint: hsl(var(--ink-faint));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-ink: hsl(var(--primary-ink));
+  --color-danger: hsl(var(--danger));
+  --color-success: hsl(var(--success));
+  --color-working: hsl(var(--working));
+
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: hsl(var(--ink));
+    /* Transparent so the macOS window vibrancy shows through the sidebar. */
+    background: transparent;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /*
+     * Streaming text must never be selectable mid-animation in a way that
+     * fights the user, but it should be selectable once settled; that is
+     * handled per-element instead of globally.
+     */
+    user-select: text;
+  }
+
+  /* The title bar is an overlay, so the top strip is a drag handle. */
+  [data-tauri-drag-region] {
+    -webkit-app-region: drag;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  input,
+  textarea {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    outline: none;
+  }
+
+  textarea {
+    resize: none;
+  }
+
+  /* Focus is visible but never a full-browser blue outline ring. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ink) / 0.35);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /*
+   * Text fields are the exception. Browsers report `:focus-visible` for a text
+   * field even when it was focused by a click — a caret is "visible focus" — so
+   * the rule above drew a detached grey ring around the composer every time it
+   * was clicked. A text field already shows focus with its caret; its frame
+   * (the composer card, a settings input) firms its border instead.
+   */
+  textarea:focus-visible,
+  select:focus-visible,
+  input:not([type='checkbox']):not([type='radio']):focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background: hsl(var(--ink) / 0.14);
+  }
+
+  /*
+   * A thin, self-effacing scrollbar: the thread scrolls constantly, and a
+   * persistent native bar on every column would be visual noise.
+   */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--ink-faint) / 0.35);
+    border-radius: var(--radius-full);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--ink-faint) / 0.6);
+    background-clip: content-box;
+  }
+}
+
+@layer utilities {
+  /*
+   * The streaming caret: a soft block that breathes rather than a hard blink,
+   * so four simultaneous streams do not strobe.
+   */
+  .caret {
+    display: inline-block;
+    width: 0.5em;
+    height: 1.05em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    border-radius: 1.5px;
+    background: hsl(var(--ink) / 0.55);
+    animation: caret-breathe 1.15s var(--ease-in-out) infinite;
+  }
+
+  @keyframes caret-breathe {
+    0%,
+    100% {
+      opacity: 0.85;
+    }
+    50% {
+      opacity: 0.2;
+    }
+  }
+
+  /*
+   * The "thinking" shimmer: a highlight travelling across the label. Used
+   * instead of a spinner because it sits on the text that already explains what
+   * is happening.
+   */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--ink-muted)) 0%,
+      hsl(var(--ink-muted)) 40%,
+      hsl(var(--ink)) 50%,
+      hsl(var(--ink-muted)) 60%,
+      hsl(var(--ink-muted)) 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 1.8s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 150% 0;
+    }
+    100% {
+      background-position: -50% 0;
+    }
+  }
+
+  /* Fades the top of a scrollable block, so scrolled-away text dissolves. */
+  .fade-top {
+    mask-image: linear-gradient(to bottom, transparent 0%, black 24px);
+  }
+
+  /*
+   * The thinking window: a few lines of reasoning with *both* edges dissolving.
+   *
+   * Top and bottom are asymmetric on purpose — the top is where text has just
+   * been scrolled out of the window, the bottom is where it is still arriving —
+   * and the alpha at each end is set so the fade lands where a line of text
+   * actually is rather than in the gap between two. `mask-image` on the scroll
+   * container rather than a gradient overlay keeps the text itself selectable
+   * and keeps the highlight-colour fixups that come with overlay pseudo-elements
+   * out of the picture.
+   */
+  .fade-both {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      rgb(0 0 0 / 0.15) 6px,
+      black 22px,
+      black calc(100% - 22px),
+      rgb(0 0 0 / 0.15) calc(100% - 6px),
+      transparent 100%
+    );
+  }
+
+  /*
+   * The same mask, shorter, for the three-line window while thinking is in
+   * flight: the bottom fade is what makes it read as a view onto something
+   * ongoing rather than a block of text that stops mid-sentence.
+   */
+  .fade-thinking {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      black 14px,
+      black calc(100% - 18px),
+      rgb(0 0 0 / 0.25) calc(100% - 6px),
+      transparent 100%
+    );
+  }
+
+  /*
+   * The typewriter's caret. A block rather than a line, weighted like the serif
+   * headline it sits in, and it keeps blinking between phrases so the line does
+   * not appear to have finished.
+   */
+  .tw-caret {
+    display: inline-block;
+    width: 2px;
+    height: 0.95em;
+    margin-left: 0.14em;
+    background: hsl(var(--ink) / 0.7);
+    border-radius: 1px;
+    animation: caret-blink 1.05s steps(1, end) infinite;
+  }
+
+  @keyframes caret-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tw-caret {
+      animation: none;
+    }
+  }
+
+  .glass {
+    background: hsl(var(--surface) / 0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
+/*
+ * Motion primitives.
+ *
+ * Deliberately CSS rather than a JS animation library for the cases that
+ * animate constantly (list insertion, overlays, the sidebar): these run on the
+ * compositor and do not touch React at all, which is what keeps the streaming
+ * path free of layout work.
+ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes collapse-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in var(--dur-base) var(--ease-out) both;
+}
+
+.animate-rise-in {
+  animation: rise-in var(--dur-base) var(--ease-out) both;
+}
+
+.animate-pop-in {
+  animation: pop-in var(--dur-fast) var(--ease-out) both;
+}
+
+.animate-dialog-in {
+  animation: dialog-in var(--dur-base) var(--ease-out) both;
+}
+
+/*
+ * Message enter animation. Used only for messages whose *insertion* is new —
+ * never for a message receiving more text, which would re-trigger the animation
+ * on every token and look like flicker.
+ */
+.message-enter {
+  animation: rise-in var(--dur-base) var(--ease-out) both;
+}

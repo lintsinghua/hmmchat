@@ -1,0 +1,357 @@
+/*
+ * Markdown styling for assistant replies.
+ *
+ * Streamdown owns the chrome for code blocks, tables, inline code and links —
+ * it renders `data-streamdown="code-block"`, `"code-block-body"` (its own
+ * `<pre>`), `"table"` and so on. So the rules here deliberately do NOT style
+ * `pre`, `table` or `code`: doing that produced a doubly-boxed code block and a
+ * stray language label, because both the wrapper and Streamdown's inner element
+ * were being bordered.
+ *
+ * What is left is what Streamdown does not wrap: the reading typography. This is
+ * the surface the user actually reads, so it gets real measure, real heading
+ * hierarchy, and no decorative boxes competing with the text. Assistant output
+ * has no bubble — it sits directly on the canvas, which is what makes the app
+ * feel like a document rather than a message log.
+ */
+
+.md {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: hsl(var(--ink));
+  /* CJK needs slightly looser tracking than Latin to avoid a dense look. */
+  letter-spacing: 0.006em;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* --- Rhythm -------------------------------------------------------------- */
+
+.md > * + * {
+  margin-top: 0.9em;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+/* --- Headings ------------------------------------------------------------ */
+
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.012em;
+  color: hsl(var(--ink));
+}
+
+.md h1 {
+  font-size: var(--text-xl);
+  margin-top: 1.5em;
+}
+
+.md h2 {
+  font-size: var(--text-lg);
+  margin-top: 1.4em;
+}
+
+.md h3 {
+  font-size: var(--text-base);
+  margin-top: 1.3em;
+}
+
+.md h4 {
+  font-size: var(--text-base);
+  color: hsl(var(--ink-soft));
+  margin-top: 1.2em;
+}
+
+/* --- Text ---------------------------------------------------------------- */
+
+.md p {
+  margin: 0;
+}
+
+.md strong {
+  font-weight: 600;
+  color: hsl(var(--ink));
+}
+
+.md em {
+  font-style: italic;
+}
+
+.md a {
+  color: hsl(var(--ink));
+  text-decoration: underline;
+  text-decoration-color: hsl(var(--ink-faint));
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-color var(--dur-instant) var(--ease-out);
+}
+
+.md a:hover {
+  text-decoration-color: hsl(var(--ink));
+}
+
+.md hr {
+  border: none;
+  border-top: 1px solid hsl(var(--line));
+  margin: 1.6em 0;
+}
+
+/* --- Lists --------------------------------------------------------------- */
+
+.md ul,
+.md ol {
+  padding-left: 1.35em;
+  margin: 0;
+}
+
+/*
+ * Tailwind's preflight sets `list-style: none`, and Streamdown's own list
+ * utilities live in node_modules, which this build does not scan — so without
+ * these, ordered lists lost their numerals and bullets disappeared.
+ */
+.md ul {
+  list-style: disc outside;
+}
+
+.md ol {
+  list-style: decimal outside;
+}
+
+.md li + li {
+  margin-top: 0.35em;
+}
+
+.md li::marker {
+  color: hsl(var(--ink-faint));
+}
+
+.md ul li::marker {
+  font-size: 0.85em;
+}
+
+.md li > ul,
+.md li > ol {
+  margin-top: 0.35em;
+}
+
+/* --- Blockquote ---------------------------------------------------------- */
+
+.md blockquote {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid hsl(var(--line-strong));
+  color: hsl(var(--ink-soft));
+}
+
+/* --- Task lists ---------------------------------------------------------- */
+
+.md input[type='checkbox'] {
+  margin-right: 0.4em;
+  accent-color: hsl(var(--ink));
+}
+
+/*
+ * --- Streamdown's own chrome, adjusted to this palette -------------------
+ *
+ * Scoped to Streamdown's data attributes so the rules are unambiguous about
+ * which element they mean — the outer container, not the inner code body.
+ */
+
+.md [data-streamdown='code-block'] {
+  /* The anchor for the copy control, which Streamdown positions absolutely. */
+  position: relative;
+  margin: 0.9em 0;
+  border: 1px solid hsl(var(--line));
+  border-radius: var(--radius-md);
+  background: hsl(var(--surface));
+  overflow: hidden;
+}
+
+/* The inner body must not draw a second border. */
+.md [data-streamdown='code-block-body'] {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  /* Code is the one place horizontal scrolling is correct. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.md [data-streamdown='code-block-body'] code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre;
+}
+
+/* A single hairline separates the header row from the code. */
+.md [data-streamdown='code-block-header'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 10px 5px 12px;
+  border-bottom: 1px solid hsl(var(--line));
+  background: hsl(var(--surface));
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: hsl(var(--ink-faint));
+}
+
+/*
+ * Streamdown lays its copy control out with Tailwind utilities from inside
+ * node_modules, which this build does not scan — so none of them exist, and the
+ * button fell back to the browser default: a bordered box parked over the
+ * language label. Its layout is written out here instead, aligned to the
+ * header row.
+ */
+.md [data-streamdown='code-block'] > div:has(> [data-streamdown='code-block-actions']) {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  pointer-events: none;
+}
+
+.md [data-streamdown='code-block-actions'] {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /*
+   * Streamdown gives this bar `border bg-sidebar/80 px-1.5 py-1`. The app's own
+   * classes make `border` exist but `border-sidebar` does not, so it drew a
+   * 1px currentColor (black) frame around an empty bar. No chrome at all here:
+   * the button carries its own hover state.
+   */
+  border: none;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  pointer-events: auto;
+}
+
+/* The copy control is an icon button; keep it quiet until hover. */
+.md [data-streamdown='code-block-copy-button'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: hsl(var(--ink-faint));
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-instant) var(--ease-out),
+    color var(--dur-instant) var(--ease-out),
+    background-color var(--dur-instant) var(--ease-out);
+}
+
+.md [data-streamdown='code-block-copy-button']:hover {
+  color: hsl(var(--ink));
+  background: hsl(var(--surface-hover));
+}
+
+.md [data-streamdown='code-block']:hover [data-streamdown='code-block-copy-button'],
+.md [data-streamdown='code-block-copy-button']:focus-visible {
+  opacity: 1;
+}
+
+.md [data-streamdown='inline-code'] {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.12em 0.36em;
+  border-radius: 5px;
+  background: hsl(var(--ink) / 0.055);
+}
+
+.dark .md [data-streamdown='inline-code'] {
+  background: hsl(var(--ink) / 0.1);
+}
+
+/* --- Tables -------------------------------------------------------------- */
+
+.md [data-streamdown='table-wrapper'] {
+  border: 1px solid hsl(var(--line));
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.md [data-streamdown='table'] {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.md [data-streamdown='table-header-cell'] {
+  text-align: left;
+  font-weight: 600;
+  color: hsl(var(--ink-soft));
+  padding: 7px 12px;
+  border-bottom: 1px solid hsl(var(--line-strong));
+  background: hsl(var(--surface));
+  white-space: nowrap;
+}
+
+.md [data-streamdown='table-cell'] {
+  padding: 7px 12px;
+  border-bottom: 1px solid hsl(var(--line));
+  vertical-align: top;
+}
+
+.md [data-streamdown='table-row']:last-child [data-streamdown='table-cell'] {
+  border-bottom: none;
+}
+
+/*
+ * --- Multi-column compaction ---------------------------------------------
+ *
+ * In compare mode each column is ~1/3 the width, so full-size type and generous
+ * line height would waste the space that makes comparison possible. Body type
+ * steps down slightly; Streamdown's own chrome is left to Streamdown, since it
+ * already sizes itself to its container.
+ */
+.md-compact {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.md-compact > * + * {
+  margin-top: 0.7em;
+}
+
+.md-compact h1 {
+  font-size: var(--text-lg);
+}
+
+.md-compact h2,
+.md-compact h3 {
+  font-size: var(--text-base);
+}
+
+.md-compact [data-streamdown='code-block-body'] {
+  padding: 10px 12px;
+  font-size: 12px;
+}

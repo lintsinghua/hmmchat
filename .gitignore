@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+coverage
+src-tauri/target
+src-tauri/gen
+
+# Read-only screenshot dump from `pnpm verify:ui`; regenerate any time.
+shots
+
+# The product film project. Deliberately not part of this repository.
+promo
