@@ -1,6 +1,6 @@
 [package]
 name = "hmmchat"
-version = "0.1.1"
+version = "0.1.2"
 description = "A restrained multi-provider AI chat client"
 authors = ["lintsinghua"]
 edition = "2021"

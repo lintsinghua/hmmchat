@@ -548,8 +548,9 @@ export function Composer({
                 const included = !selectable || targets.some((lane) => lane.id === chip.laneId)
                 const lastIncluded = included && targets.length === 1
                 const canReorder = chips.length > 1
-                const isDraggingChip =
-                  draggingChipId === chip.id || Boolean(chip.laneId && draggingLaneId === chip.laneId)
+                const isPointerDragging = draggingChipId === chip.id
+                const isSyncedDragging =
+                  !isPointerDragging && Boolean(chip.laneId && draggingLaneId === chip.laneId)
                 return (
                   <div
                     key={chip.id}
@@ -558,12 +559,14 @@ export function Composer({
                       'group/chip flex h-7 shrink-0 items-center gap-0.5 rounded-[7px] pr-1',
                       selectable ? 'pl-1' : 'pl-2',
                       'text-[12.5px] font-medium',
-                      'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
+                      'transition-[background-color,color,box-shadow] duration-[var(--dur-instant)] ease-[var(--ease-out)]',
                       canReorder && 'cursor-grab select-none active:cursor-grabbing',
                       included
                         ? 'text-ink-soft hover:bg-surface-hover hover:text-ink'
                         : 'text-ink-faint outline outline-1 -outline-offset-1 outline-dashed outline-line-strong hover:text-ink-muted',
-                      isDraggingChip && 'bg-surface-active text-ink ring-1 ring-line-strong',
+                      isPointerDragging &&
+                        'bg-paper text-ink shadow-[var(--shadow-raised)] ring-1 ring-inset ring-line-strong',
+                      isSyncedDragging && 'bg-surface-active text-ink',
                     )}
                   >
                     {selectable ? (

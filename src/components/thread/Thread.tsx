@@ -170,7 +170,11 @@ function TurnBlock({
   const useTabs = answering.length > 1 && width > 0 && perColumn < MIN_COLUMN_WIDTH
   const shown = useTabs ? [answering[Math.min(activeTab, answering.length - 1)]] : lanes
 
-  const { containerRef: gridRef, getItemProps: getColumnProps } = useLaneReorder<HTMLDivElement>({
+  const {
+    containerRef: gridRef,
+    draggingId: draggingColumnId,
+    getItemProps: getColumnProps,
+  } = useLaneReorder<HTMLDivElement>({
     enabled: !useTabs && shown.length > 1,
     requireHandle: true,
     onMove: (fromId, toId) => void moveLane(fromId, toId),
@@ -218,15 +222,19 @@ function TurnBlock({
         }
       >
         {shown.map((lane, index) => {
-          const isDragging = shown.length > 1 && draggingLaneId === lane.id
+          const isPointerDragging = shown.length > 1 && draggingColumnId === lane.id
+          const isSyncedDragging =
+            shown.length > 1 && !isPointerDragging && draggingLaneId === lane.id
           return (
             <div
               key={lane.id}
               {...(shown.length > 1 ? getColumnProps(lane.id) : {})}
               className={cn(
-                'min-w-0',
-                isDragging &&
-                  'rounded-[var(--radius-sm)] bg-surface/60 outline outline-1 outline-offset-4 outline-line-strong',
+                'min-w-0 rounded-[var(--radius-sm)] transition-[background-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
+                isPointerDragging &&
+                  'bg-canvas/95 shadow-[var(--shadow-overlay)] outline outline-1 outline-offset-4 outline-line-strong backdrop-blur-[2px]',
+                isSyncedDragging &&
+                  'bg-surface/60 outline outline-1 outline-offset-4 outline-line',
               )}
             >
               {!useTabs && skipped.has(lane.id) ? (
@@ -381,7 +389,8 @@ function LaneTabs({
             'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
             lanes.length > 1 && 'cursor-grab select-none active:cursor-grabbing',
             active === index ? 'text-ink' : 'text-ink-muted hover:text-ink-soft',
-            draggingLaneId === lane.id && 'bg-surface-active text-ink',
+            draggingLaneId === lane.id &&
+              'bg-paper text-ink shadow-[var(--shadow-raised)] ring-1 ring-inset ring-line-strong',
           )}
         >
           <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5" />
