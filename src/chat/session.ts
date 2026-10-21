@@ -533,6 +533,50 @@ function setLaneHidden(graph: ConversationGraph, laneId: string, hidden: boolean
   }
 }
 
+let positionWrite: Promise<void> = Promise.resolve()
+
+/**
+ * Moves a visible column to another column's position.
+ *
+ * `conversation.lanes` is the single display order for both the transcript's
+ * columns and the composer's model chips, so dragging either keeps the other
+ * in step.
+ */
+export async function moveLane(fromLaneId: string, toLaneId: string): Promise<void> {
+  if (fromLaneId === toLaneId) return
+  const graph = useStore.getState().graph
+  if (!graph) return
+
+  const visible = visibleLanes(graph.conversation.lanes)
+  const fromIndex = visible.findIndex((lane) => lane.id === fromLaneId)
+  const toIndex = visible.findIndex((lane) => lane.id === toLaneId)
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return
+
+  const reordered = [...visible]
+  const [moved] = reordered.splice(fromIndex, 1)
+  reordered.splice(toIndex, 0, moved)
+
+  let cursor = 0
+  const nextLanes = graph.conversation.lanes.map((lane) =>
+    lane.hidden ? lane : reordered[cursor++],
+  )
+
+  useStore.getState().setGraph({
+    ...graph,
+    conversation: { ...graph.conversation, lanes: nextLanes },
+  })
+
+  positionWrite = positionWrite
+    .catch(() => undefined)
+    .then(async () => {
+      const latest = useStore.getState().graph
+      const lanes =
+        latest?.conversation.id === graph.conversation.id ? latest.conversation.lanes : nextLanes
+      await db.updateLanePositions(lanes)
+    })
+  await positionWrite
+}
+
 /** Edits a previous question, branching the conversation from that point. */
 export async function editTurn(turnId: string, newText: string): Promise<void> {
   const state = useStore.getState()

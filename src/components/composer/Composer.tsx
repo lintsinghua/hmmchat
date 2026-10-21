@@ -21,6 +21,7 @@ import { useStore } from '@/chat/store'
 import {
   addLane,
   MAX_LANES,
+  moveLane,
   newConversationModels,
   removeLane,
   restoreLane,
@@ -29,6 +30,7 @@ import {
   stopTurn,
   switchLaneModel,
 } from '@/chat/session'
+import { useLaneReorder } from '@/hooks/useLaneReorder'
 import {
   laneAnswerCount,
   visibleLanes,
@@ -101,6 +103,8 @@ export function Composer({
   const includeAllLanes = useStore((state) => state.includeAllLanes)
   const focusedLaneId = useStore((state) => state.focusedLaneId)
   const setFocusedLane = useStore((state) => state.setFocusedLane)
+  const draggingLaneId = useStore((state) => state.draggingLaneId)
+  const setDraggingLane = useStore((state) => state.setDraggingLane)
   const referencePicker = useStore((state) => state.referencePicker)
   const setReferencePicker = useStore((state) => state.setReferencePicker)
   const setComposerSearch = useStore((state) => state.setComposerSearch)
@@ -201,8 +205,43 @@ export function Composer({
   const chips = useMemo(() => {
     if (focused) return [{ id: focused.id, laneId: focused.id, model: focused.model }]
     if (lanes.length) return lanes.map((lane) => ({ id: lane.id, laneId: lane.id, model: lane.model }))
-    return drafts.map((model, index) => ({ id: `draft-${index}`, laneId: null as string | null, model }))
+    return drafts.map((model) => ({
+      id: `draft-${model.providerId}:${model.modelId}`,
+      laneId: null as string | null,
+      model,
+    }))
   }, [focused, lanes, drafts])
+
+  const reorderChips = useCallback(
+    (fromId: string, toId: string) => {
+      if (lanes.length > 1) {
+        void moveLane(fromId, toId)
+        return
+      }
+      const fromIndex = drafts.findIndex((model) => `draft-${model.providerId}:${model.modelId}` === fromId)
+      const toIndex = drafts.findIndex((model) => `draft-${model.providerId}:${model.modelId}` === toId)
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return
+      const next = [...drafts]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      setComposerModel(next[0])
+      useStore.getState().setSettings({
+        ...(settings.defaultModel ? { defaultModel: next[0] } : {}),
+        defaultCompareModels: next.slice(1),
+      })
+    },
+    [lanes.length, drafts, setComposerModel, settings.defaultModel],
+  )
+
+  const {
+    containerRef: chipsRef,
+    draggingId: draggingChipId,
+    getItemProps: getChipProps,
+  } = useLaneReorder<HTMLDivElement>({
+    enabled: chips.length > 1,
+    onMove: reorderChips,
+    onDragChange: setDraggingLane,
+  })
 
   /**
    * Each column's own depth control. Computed per lane rather than from the
@@ -362,6 +401,7 @@ export function Composer({
         ) : null}
         <div
           onDragOver={(event) => {
+            if (event.dataTransfer && !event.dataTransfer.types.includes('Files')) return
             // Without preventDefault the browser navigates to the dropped file.
             event.preventDefault()
             if (!dragging) setDragging(true)
@@ -448,7 +488,7 @@ export function Composer({
 
           <div className="flex items-center gap-1 px-2 pb-2 pt-1">
             {/* --- Files + model chips, one per visible lane ----------------- */}
-            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            <div ref={chipsRef} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
               <Popover open={addOpen} onOpenChange={setAddOpen}>
                 <PopoverTrigger asChild>
                   <button
@@ -501,23 +541,29 @@ export function Composer({
                 lane is created by the first send — but it keeps the composer
                 honest about which model is about to answer.
               */}
-              {chips.map((chip) => {
+              {chips.map((chip, index) => {
                 // Only real columns can be left out; the draft chip is the one
                 // model a new conversation starts with.
                 const selectable = chips.length > 1 && chip.laneId
                 const included = !selectable || targets.some((lane) => lane.id === chip.laneId)
                 const lastIncluded = included && targets.length === 1
+                const canReorder = chips.length > 1
+                const isDraggingChip =
+                  draggingChipId === chip.id || Boolean(chip.laneId && draggingLaneId === chip.laneId)
                 return (
                   <div
                     key={chip.id}
+                    {...(canReorder ? getChipProps(chip.id) : {})}
                     className={cn(
                       'group/chip flex h-7 shrink-0 items-center gap-0.5 rounded-[7px] pr-1',
                       selectable ? 'pl-1' : 'pl-2',
                       'text-[12.5px] font-medium',
                       'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
+                      canReorder && 'cursor-grab select-none active:cursor-grabbing',
                       included
                         ? 'text-ink-soft hover:bg-surface-hover hover:text-ink'
                         : 'text-ink-faint outline outline-1 -outline-offset-1 outline-dashed outline-line-strong hover:text-ink-muted',
+                      isDraggingChip && 'bg-surface-active text-ink ring-1 ring-line-strong',
                     )}
                   >
                     {selectable ? (
@@ -551,7 +597,7 @@ export function Composer({
                         </span>
                       </button>
                     ) : null}
-                    {chip.laneId || chip.id === 'draft-0' ? (
+                    {chip.laneId || index === 0 ? (
                       <ModelPicker
                         value={chip.model}
                         onSelect={(model) => {
@@ -564,7 +610,10 @@ export function Composer({
                         trigger={
                           <button
                             type="button"
-                            className="flex min-w-0 items-center gap-1.5 py-1"
+                            className={cn(
+                              'flex min-w-0 items-center gap-1.5 py-1',
+                              canReorder && 'cursor-grab active:cursor-grabbing',
+                            )}
                             title={displayName(chip.model.modelId)}
                           >
                             <ModelIcon
@@ -594,7 +643,10 @@ export function Composer({
                       // so the user sees every column that will answer, changed
                       // in settings or with the chip once the conversation exists.
                       <span
-                        className="flex min-w-0 items-center gap-1.5 py-1"
+                        className={cn(
+                          'flex min-w-0 items-center gap-1.5 py-1',
+                          canReorder && 'cursor-grab active:cursor-grabbing',
+                        )}
                         title={t(composer.defaultCompareModel, { model: displayName(chip.model.modelId) })}
                       >
                         <ModelIcon modelId={chip.model.modelId} className="h-3.5 w-3.5" />
@@ -604,6 +656,7 @@ export function Composer({
                     {chips.length > 1 && chip.laneId ? (
                       <button
                         type="button"
+                        data-no-drag
                         onClick={() => {
                           const lane = lanes.find((entry) => entry.id === chip.laneId)
                           void removeLane(chip.laneId!)

@@ -14,6 +14,7 @@ export const thread = {
   },
   skipped: { en: 'Not asked', zh: '未参与' },
   viewAlone: { en: 'View {model} alone', zh: '单独查看 {model}' },
+  dragToReorder: { en: 'Drag to reorder columns', zh: '拖动以调整列顺序' },
   scrollToBottom: { en: 'Scroll to bottom', zh: '回到底部' },
 
   // ReplyView

@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { Composer } from './Composer'
+import { Thread } from '@/components/thread/Thread'
+import { TooltipProvider } from '@/components/ui/Tooltip'
 import { useStore } from '@/chat/store'
-import type { ConversationGraph } from '@/chat/types'
+import { visibleLanes, type ConversationGraph } from '@/chat/types'
 
 /**
  * The composer's Enter handling is the highest-risk interaction in the app for
@@ -239,5 +241,117 @@ describe('Composer', () => {
     await user.keyboard('{Escape}')
     expect(useStore.getState().referencePicker).toBeNull()
     expect(textarea.value).toBe('mail a@b @')
+  })
+
+  it('reorders both the composer chips and the reply columns when dragging either surface', () => {
+    setState('anthropic', 'claude-opus-5-5')
+    useStore.setState({
+      graph: {
+        conversation: {
+          id: 'c',
+          title: 't',
+          pinned: false,
+          createdAt: 0,
+          updatedAt: 0,
+          lanes: [
+            { id: 'l1', model: { providerId: 'p', modelId: 'claude-opus-5-5' } },
+            { id: 'l2', model: { providerId: 'p', modelId: 'gemini-4-argon' } },
+            { id: 'l3', model: { providerId: 'p', modelId: 'gpt-6-astra' } },
+          ],
+          activeLeafTurnId: 't1',
+        },
+        turns: [{ id: 't1', conversationId: 'c', text: '问题', createdAt: 1 }],
+        replies: [
+          {
+            id: 'r1',
+            turnId: 't1',
+            laneId: 'l1',
+            model: { providerId: 'p', modelId: 'claude-opus-5-5' },
+            version: 1,
+            active: true,
+            status: 'done',
+            text: 'Claude 的回答',
+            steps: [],
+            sources: [],
+            opts: { reasoning: 'medium', search: 'none' },
+            createdAt: 2,
+          },
+          {
+            id: 'r2',
+            turnId: 't1',
+            laneId: 'l2',
+            model: { providerId: 'p', modelId: 'gemini-4-argon' },
+            version: 1,
+            active: true,
+            status: 'done',
+            text: 'Gemini 的回答',
+            steps: [],
+            sources: [],
+            opts: { reasoning: 'medium', search: 'none' },
+            createdAt: 2,
+          },
+          {
+            id: 'r3',
+            turnId: 't1',
+            laneId: 'l3',
+            model: { providerId: 'p', modelId: 'gpt-6-astra' },
+            version: 1,
+            active: true,
+            status: 'done',
+            text: 'GPT 的回答',
+            steps: [],
+            sources: [],
+            opts: { reasoning: 'medium', search: 'none' },
+            createdAt: 2,
+          },
+        ],
+      },
+    })
+
+    function Harness() {
+      const graph = useStore((state) => state.graph)!
+      return (
+        <TooltipProvider>
+          <Thread graph={graph} />
+          <Composer />
+        </TooltipProvider>
+      )
+    }
+
+    const { container } = render(<Harness />)
+
+    // 1. Dragging a composer model chip reorders the lanes.
+    const chips = container.querySelectorAll('[data-lane-item]')
+    // The thread has 3 column items + the composer has 3 chip items.
+    const composerChips = Array.from(chips).slice(3)
+    expect(composerChips.map((el) => el.getAttribute('data-lane-item'))).toEqual(['l1', 'l2', 'l3'])
+
+    fireEvent.pointerDown(composerChips[2], { button: 0, clientX: 200, clientY: 10 })
+    fireEvent.pointerMove(composerChips[0], { clientX: 20, clientY: 10 })
+    fireEvent.pointerUp(composerChips[0], { clientX: 20, clientY: 10 })
+
+    expect(visibleLanes(useStore.getState().graph!.conversation.lanes).map((l) => l.id)).toEqual([
+      'l3',
+      'l1',
+      'l2',
+    ])
+
+    // 2. Dragging a reply column header in the thread reorders the lanes back.
+    const handles = container.querySelectorAll('[data-lane-handle]')
+    expect(Array.from(handles).map((el) => el.getAttribute('data-lane-handle'))).toEqual([
+      'l3',
+      'l1',
+      'l2',
+    ])
+    const columns = Array.from(container.querySelectorAll('[data-turn="t1"] [data-lane-item]'))
+    fireEvent.pointerDown(handles[0], { button: 0, clientX: 20, clientY: 10 })
+    fireEvent.pointerMove(columns[2], { clientX: 400, clientY: 10 })
+    fireEvent.pointerUp(columns[2], { clientX: 400, clientY: 10 })
+
+    expect(visibleLanes(useStore.getState().graph!.conversation.lanes).map((l) => l.id)).toEqual([
+      'l1',
+      'l2',
+      'l3',
+    ])
   })
 })

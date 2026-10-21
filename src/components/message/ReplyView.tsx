@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Check,
@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Square,
 } from 'lucide-react'
-import { useState } from 'react'
 
 import type { Lane, Reply, ReplyStatus } from '@/chat/types'
 import { displayName } from '@/providers/registry'
@@ -116,6 +115,9 @@ export const ReplyView = memo(function ReplyView({
   // stream ends, so a stopped reply still shows everything that arrived.
   const visibleText = useSmoothedText(content.text, streaming)
   const [copied, setCopied] = useState(false)
+  const [entered, setEntered] = useState(false)
+  const initialIndexRef = useRef(laneIndex)
+  const reordered = laneIndex !== initialIndexRef.current
 
   const versionIndex = useMemo(
     () => (versions ? versions.findIndex((entry) => entry.id === reply.id) : -1),
@@ -136,9 +138,22 @@ export const ReplyView = memo(function ReplyView({
   const isStreaming = content.status === 'streaming'
 
   return (
-    <div className="group/reply message-enter flex min-w-0 flex-col">
+    <div
+      onAnimationEnd={() => setEntered(true)}
+      className={cn(
+        'group/reply flex min-w-0 flex-col',
+        !entered && !reordered && 'message-enter',
+      )}
+    >
       {showHeader ? (
-        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <div
+          data-lane-handle={lane.id}
+          title={t(thread.dragToReorder)}
+          className={cn(
+            'mb-2 -mx-1 flex cursor-grab select-none flex-wrap items-center gap-1.5 rounded-[6px] px-1 py-0.5',
+            'transition-colors duration-[var(--dur-instant)] hover:bg-surface-hover/70 active:cursor-grabbing',
+          )}
+        >
           <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5 text-ink-soft" />
           <span className="truncate text-[12px] font-medium text-ink-soft">
             {displayName(lane.model.modelId)}
@@ -158,6 +173,7 @@ export const ReplyView = memo(function ReplyView({
               </span>
               <button
                 type="button"
+                data-no-drag
                 onClick={onRegenerate}
                 className={cn(
                   'rounded-[5px] px-1.5 py-px text-[10.5px] font-medium',
@@ -178,6 +194,7 @@ export const ReplyView = memo(function ReplyView({
             <Tooltip label={t(thread.viewAlone, { model: displayName(lane.model.modelId) })}>
               <button
                 type="button"
+                data-no-drag
                 onClick={onFocus}
                 aria-label={t(thread.viewAlone, { model: displayName(lane.model.modelId) })}
                 className={cn(

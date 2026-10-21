@@ -468,6 +468,14 @@ export async function updateLaneModel(
   ])
 }
 
+/** Updates the display order of a conversation's lanes in place. */
+export async function updateLanePositions(lanes: Lane[]): Promise<void> {
+  const database = await db()
+  for (const [index, lane] of lanes.entries()) {
+    await database.execute('UPDATE lanes SET position = ? WHERE id = ?', [index, lane.id])
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Turns and replies
 // ---------------------------------------------------------------------------

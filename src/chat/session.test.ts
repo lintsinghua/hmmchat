@@ -9,6 +9,7 @@ import {
   duplicateConversation,
   editTurn,
   forkFromTurn,
+  moveLane,
   newConversationModels,
   newConversationPrefs,
   openConversation,
@@ -457,5 +458,54 @@ describe('newConversationModels', () => {
   it('falls back to the first enabled model and never lists one twice', () => {
     expect(newConversationModels(providers, settings({ defaultCompareModels: [a, a] }), [null])).toEqual([a])
     expect(newConversationModels([], settings({}), [a])).toEqual([])
+  })
+})
+
+describe('reordering columns', () => {
+  it('reorders visible lanes in memory and persists the new positions across reloads', async () => {
+    const { conversation } = await seed()
+    await addLane({ providerId: 'p', modelId: 'gemini-4-argon' })
+    await addLane({ providerId: 'p', modelId: 'gpt-6-astra' })
+    const initial = visibleLanes(useStore.getState().graph!.conversation.lanes)
+    expect(initial.map((lane) => lane.model.modelId)).toEqual([
+      'claude-opus-5-5',
+      'gemini-4-argon',
+      'gpt-6-astra',
+    ])
+
+    await moveLane(initial[2].id, initial[0].id)
+
+    expect(
+      visibleLanes(useStore.getState().graph!.conversation.lanes).map((lane) => lane.model.modelId),
+    ).toEqual(['gpt-6-astra', 'claude-opus-5-5', 'gemini-4-argon'])
+
+    const reloaded = await db.loadGraph(conversation.id)
+    expect(visibleLanes(reloaded!.conversation.lanes).map((lane) => lane.model.modelId)).toEqual([
+      'gpt-6-astra',
+      'claude-opus-5-5',
+      'gemini-4-argon',
+    ])
+  })
+
+  it('preserves hidden lanes while reordering visible columns', async () => {
+    const { conversation } = await seed()
+    await addLane({ providerId: 'p', modelId: 'gemini-4-argon' })
+    await addLane({ providerId: 'p', modelId: 'gpt-6-astra' })
+    const all = visibleLanes(useStore.getState().graph!.conversation.lanes)
+    await removeLane(all[1].id)
+
+    await moveLane(all[0].id, all[2].id)
+
+    expect(
+      visibleLanes(useStore.getState().graph!.conversation.lanes).map((lane) => lane.model.modelId),
+    ).toEqual(['gpt-6-astra', 'claude-opus-5-5'])
+
+    await restoreLane(all[1].id)
+    const reloaded = await db.loadGraph(conversation.id)
+    expect(visibleLanes(reloaded!.conversation.lanes).map((lane) => lane.model.modelId)).toEqual([
+      'gpt-6-astra',
+      'gemini-4-argon',
+      'claude-opus-5-5',
+    ])
   })
 })

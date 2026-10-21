@@ -116,6 +116,8 @@ interface State {
    * conversation changes or the column stops being visible.
    */
   focusedLaneId: string | null
+  /** Column currently being dragged in the composer or transcript. */
+  draggingLaneId: string | null
   /**
    * The quote-a-conversation dialog, when open. `conversationId` skips straight
    * to choosing rounds — the sidebar's quote action knows which one it means.
@@ -145,6 +147,7 @@ interface State {
   toggleLaneExcluded: (laneId: string) => void
   includeAllLanes: () => void
   setFocusedLane: (laneId: string | null) => void
+  setDraggingLane: (laneId: string | null) => void
   setReferencePicker: (picker: { conversationId?: string } | null) => void
   setComposerSearch: (mode: SearchMode) => void
   /** Puts the composer back the way a conversation was last sent. */
@@ -170,6 +173,7 @@ export const useStore = create<State>((set, get) => ({
   laneReasoning: {},
   excludedLaneIds: [],
   focusedLaneId: null,
+  draggingLaneId: null,
   referencePicker: null,
   // Overwritten at boot from the settings, and on every open from the
   // conversation's own last send; this is only the value before either runs.
@@ -198,6 +202,9 @@ export const useStore = create<State>((set, get) => ({
       (previous?.conversation.id !== graph?.conversation.id || lanes.length < 2 || !lanes.some((lane) => lane.id === focused))
     ) {
       set({ focusedLaneId: null })
+    }
+    if (previous?.conversation.id !== graph?.conversation.id) {
+      set({ draggingLaneId: null })
     }
   },
   setLoadingGraph: (loadingGraph) => set({ loadingGraph }),
@@ -266,6 +273,7 @@ export const useStore = create<State>((set, get) => ({
     })),
   includeAllLanes: () => set({ excludedLaneIds: [] }),
   setFocusedLane: (focusedLaneId) => set({ focusedLaneId }),
+  setDraggingLane: (draggingLaneId) => set({ draggingLaneId }),
   setReferencePicker: (referencePicker) => set({ referencePicker }),
   setComposerSearch: (composerSearch) => set({ composerSearch }),
   restoreComposer: (prefs) =>
@@ -286,6 +294,7 @@ export const useStore = create<State>((set, get) => ({
       running: [],
       composerModel: null,
       focusedLaneId: null,
+      draggingLaneId: null,
     }),
 }))
 

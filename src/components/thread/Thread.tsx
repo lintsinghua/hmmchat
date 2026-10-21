@@ -17,6 +17,7 @@ import {
 import {
   editTurn,
   forkFromTurn,
+  moveLane,
   regenerate,
   selectBranch,
   selectReplyVersion,
@@ -26,6 +27,7 @@ import { useStore } from '@/chat/store'
 import { displayName } from '@/providers/registry'
 import { ModelIcon } from '@/components/icons/BrandIcon'
 import { useElementWidth } from '@/hooks/useElementWidth'
+import { useLaneReorder } from '@/hooks/useLaneReorder'
 import { cn } from '@/lib/cn'
 import { ReplyView } from '@/components/message/ReplyView'
 import { useT } from '@/i18n/core'
@@ -145,7 +147,9 @@ function TurnBlock({
   onFocus: (laneId: string) => void
 }) {
   const [measureRef, width] = useElementWidth<HTMLDivElement>()
-  const [activeTab, setActiveTab] = useState(0)
+  const [activeLaneId, setActiveLaneId] = useState<string | null>(null)
+  const draggingLaneId = useStore((state) => state.draggingLaneId)
+  const setDraggingLane = useStore((state) => state.setDraggingLane)
 
   const siblings = siblingTurns(graph, turn)
   const siblingIndex = siblings.findIndex((entry) => entry.id === turn.id)
@@ -155,12 +159,23 @@ function TurnBlock({
   // room. Tabs, when the answers need them, list only the columns that answered.
   const skipped = new Set(lanes.filter((lane) => laneSkipped(graph, turn, lane)).map((lane) => lane.id))
   const answering = lanes.filter((lane) => !skipped.has(lane.id))
+  const activeTab = useMemo(() => {
+    const found = activeLaneId ? answering.findIndex((lane) => lane.id === activeLaneId) : -1
+    return found >= 0 ? found : 0
+  }, [activeLaneId, answering])
 
   // Columns give way to tabs once each would be too narrow to read a paragraph
   // in. That threshold is a reading-measure decision, not a pixel-fitting one.
   const perColumn = (width - skipped.size * SKIPPED_COLUMN_WIDTH) / Math.max(1, answering.length)
   const useTabs = answering.length > 1 && width > 0 && perColumn < MIN_COLUMN_WIDTH
   const shown = useTabs ? [answering[Math.min(activeTab, answering.length - 1)]] : lanes
+
+  const { containerRef: gridRef, getItemProps: getColumnProps } = useLaneReorder<HTMLDivElement>({
+    enabled: !useTabs && shown.length > 1,
+    requireHandle: true,
+    onMove: (fromId, toId) => void moveLane(fromId, toId),
+    onDragChange: setDraggingLane,
+  })
 
   return (
     <div ref={measureRef} data-turn={turn.id} className="flex flex-col gap-4">
@@ -181,10 +196,16 @@ function TurnBlock({
       />
 
       {useTabs ? (
-        <LaneTabs lanes={answering} active={activeTab} onChange={setActiveTab} onFocus={onFocus} />
+        <LaneTabs
+          lanes={answering}
+          active={activeTab}
+          onChange={(index) => setActiveLaneId(answering[index]?.id ?? null)}
+          onFocus={onFocus}
+        />
       ) : null}
 
       <div
+        ref={gridRef}
         className="grid gap-x-6 gap-y-6"
         style={
           shown.length > 1
@@ -196,24 +217,36 @@ function TurnBlock({
             : undefined
         }
       >
-        {shown.map((lane, index) =>
-          !useTabs && skipped.has(lane.id) ? (
-            <SkippedColumn key={lane.id} lane={lane} />
-          ) : (
-            <LaneColumn
+        {shown.map((lane, index) => {
+          const isDragging = shown.length > 1 && draggingLaneId === lane.id
+          return (
+            <div
               key={lane.id}
-              graph={graph}
-              turn={turn}
-              lane={lane}
-              laneCount={shown.length}
-              laneIndex={shown.length > 1 ? index : 0}
-              // Compare mode trades type size for the ability to see both answers
-              // at once, which is the whole point of the layout.
-              compact={shown.length - skipped.size > 1}
-              onFocus={lanes.length > 1 ? () => onFocus(lane.id) : undefined}
-            />
-          ),
-        )}
+              {...(shown.length > 1 ? getColumnProps(lane.id) : {})}
+              className={cn(
+                'min-w-0',
+                isDragging &&
+                  'rounded-[var(--radius-sm)] bg-surface/60 outline outline-1 outline-offset-4 outline-line-strong',
+              )}
+            >
+              {!useTabs && skipped.has(lane.id) ? (
+                <SkippedColumn lane={lane} canReorder={shown.length > 1} />
+              ) : (
+                <LaneColumn
+                  graph={graph}
+                  turn={turn}
+                  lane={lane}
+                  laneCount={shown.length}
+                  laneIndex={shown.length > 1 ? index : 0}
+                  // Compare mode trades type size for the ability to see both answers
+                  // at once, which is the whole point of the layout.
+                  compact={shown.length - skipped.size > 1}
+                  onFocus={lanes.length > 1 ? () => onFocus(lane.id) : undefined}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -225,11 +258,15 @@ function TurnBlock({
  * Kept as a narrow strip rather than removed, so each model stays in the same
  * column from one turn to the next and it is plain at a glance who answered.
  */
-function SkippedColumn({ lane }: { lane: Lane }) {
+function SkippedColumn({ lane, canReorder }: { lane: Lane; canReorder?: boolean }) {
   const t = useT()
   return (
     <div
-      className="flex min-w-0 items-start gap-1.5 border-l border-dashed border-line-strong pl-3 pt-1 text-[12px] text-ink-faint"
+      data-lane-handle={canReorder ? lane.id : undefined}
+      className={cn(
+        'flex h-full min-w-0 items-start gap-1.5 border-l border-dashed border-line-strong pl-3 pt-1 text-[12px] text-ink-faint',
+        canReorder && 'cursor-grab select-none active:cursor-grabbing',
+      )}
       title={t(thread.skippedTitle, { model: displayName(lane.model.modelId) })}
     >
       <ModelIcon modelId={lane.model.modelId} className="mt-[1px] h-3.5 w-3.5 shrink-0 opacity-50 grayscale" />
@@ -269,7 +306,14 @@ function LaneColumn({
     // No answer and nothing to inherit: this lane was added after the turn and
     // descends from nothing that answered it either.
     return (
-      <div className="select-none pt-1 text-[13px] text-ink-faint" aria-hidden>
+      <div
+        data-lane-handle={laneCount > 1 ? lane.id : undefined}
+        className={cn(
+          'select-none pt-1 text-[13px] text-ink-faint',
+          laneCount > 1 && 'cursor-grab active:cursor-grabbing',
+        )}
+        aria-hidden
+      >
         —
       </div>
     )
@@ -315,19 +359,29 @@ function LaneTabs({
   onFocus: (laneId: string) => void
 }) {
   const t = useT()
+  const draggingLaneId = useStore((state) => state.draggingLaneId)
+  const setDraggingLane = useStore((state) => state.setDraggingLane)
+  const { containerRef: tabsRef, getItemProps: getTabProps } = useLaneReorder<HTMLDivElement>({
+    enabled: lanes.length > 1,
+    onMove: (fromId, toId) => void moveLane(fromId, toId),
+    onDragChange: setDraggingLane,
+  })
   const current = lanes[Math.min(active, lanes.length - 1)]
   const viewAlone = t(thread.viewAlone, { model: displayName(current.model.modelId) })
   return (
-    <div className="flex items-center gap-1 border-b border-line pb-2">
+    <div ref={tabsRef} className="flex items-center gap-1 border-b border-line pb-2">
       {lanes.map((lane, index) => (
         <button
           key={lane.id}
           type="button"
+          {...(lanes.length > 1 ? getTabProps(lane.id) : {})}
           onClick={() => onChange(index)}
           className={cn(
             'relative flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] font-medium',
             'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
+            lanes.length > 1 && 'cursor-grab select-none active:cursor-grabbing',
             active === index ? 'text-ink' : 'text-ink-muted hover:text-ink-soft',
+            draggingLaneId === lane.id && 'bg-surface-active text-ink',
           )}
         >
           <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5" />

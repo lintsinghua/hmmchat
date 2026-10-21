@@ -30,6 +30,7 @@ export const composer = {
   skippedUnsupported: { en: 'Skipped {count} unsupported files', zh: '已跳过 {count} 个不支持的文件' },
 
   // --- Model chips ---------------------------------------------------------
+  dragToReorder: { en: 'Drag to reorder models', zh: '拖动以调整模型顺序' },
   sendTo: { en: 'Send to {model}', zh: '发给 {model}' },
   atLeastOneModel: { en: 'At least one model must receive the message', zh: '至少要发给一个模型' },
   excludeFromNext: { en: 'Stop sending to {model} from the next message', zh: '下一条起不发给 {model}' },
