@@ -39,6 +39,22 @@
   margin-bottom: 0;
 }
 
+/* --- Math ---------------------------------------------------------------- */
+
+/*
+ * A long display formula scrolls inside its own box rather than widening the
+ * column — in compare mode a column is a third of the window.
+ */
+.md .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+}
+
+.md .katex {
+  font-size: 1.08em;
+}
+
 /* --- Headings ------------------------------------------------------------ */
 
 .md h1,

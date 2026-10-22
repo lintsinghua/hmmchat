@@ -1,11 +1,14 @@
 import { useMemo, type MouseEvent } from 'react'
 import { Streamdown, type PluginConfig, type StreamdownTranslations } from 'streamdown'
+import { createMathPlugin } from '@streamdown/math'
 import remarkCjkFriendly from 'remark-cjk-friendly'
 import 'streamdown/styles.css'
+import 'katex/dist/katex.min.css'
 import { cn } from '@/lib/cn'
 import { openExternal } from '@/lib/open'
 import { getLanguage, useT } from '@/i18n/core'
 import { thread } from '@/i18n'
+import { normalizeMath } from '@/lib/math'
 
 /**
  * Assistant message body.
@@ -21,9 +24,14 @@ import { thread } from '@/i18n'
  * ordering matters: without it, `**粗体：**` followed by Chinese punctuation
  * fails to parse as emphasis, which is the single most common markdown defect
  * in Chinese model output.
+ *
+ * The `math` plugin renders KaTeX. Its parser only sees `$$…$$`;
+ * `normalizeMath` first rewrites the `\(…\)`, `\[…\]` and `$…$` that models
+ * actually write, so a lone dollar in a price is never read as a formula.
  */
 
-const CJK_PLUGINS: PluginConfig = {
+const PLUGINS: PluginConfig = {
+  math: createMathPlugin({ errorColor: 'hsl(var(--ink-muted))' }),
   cjk: {
     name: 'cjk',
     type: 'cjk',
@@ -68,6 +76,8 @@ export function Markdown({ children, streaming, compact, className }: MarkdownPr
     [language],
   )
 
+  const source = useMemo(() => normalizeMath(children), [children])
+
   // Links open in the system browser rather than navigating the webview: doing
   // otherwise would replace the app with a web page and lose the session.
   const handleClick = useMemo(
@@ -90,7 +100,7 @@ export function Markdown({ children, streaming, compact, className }: MarkdownPr
       <Streamdown
         mode={streaming ? 'streaming' : 'static'}
         isAnimating={streaming}
-        plugins={CJK_PLUGINS}
+        plugins={PLUGINS}
         translations={translations}
         // The caret is rendered by the smoother at the true end of the visible
         // text; Streamdown's own would double up on it.
@@ -106,7 +116,7 @@ export function Markdown({ children, streaming, compact, className }: MarkdownPr
         codeBlockMaxHeight={560}
         tableMaxHeight={420}
       >
-        {children}
+        {source}
       </Streamdown>
     </div>
   )
