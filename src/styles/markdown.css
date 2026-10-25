@@ -28,31 +28,72 @@
 /* --- Rhythm -------------------------------------------------------------- */
 
 /*
- * Blocks sit one level down: Streamdown wraps them all in a single `div`. Its
- * own spacing on that wrapper (`space-y-4`) is a utility from node_modules,
- * which this build does not scan — so the gap between paragraphs is set here,
- * or there is none and a paragraph break reads like a plain line break.
+ * Space says how things relate: the closer two blocks belong, the less room
+ * between them. So there is no single paragraph gap but a small scale —
+ *
+ *   tight    a heading and its content; items of one list; a lead-in line
+ *            and the list it introduces
+ *   para     one paragraph and the next
+ *   block    around anything set apart from the text: code, tables, display
+ *            math, quotes
+ *   section  before a heading — the largest, so the outline reads at a glance
+ *
+ * Every step is a multiple of the body size, so compact columns scale the
+ * whole rhythm by changing one variable.
+ *
+ * Blocks sit one level down: Streamdown wraps them in a single `div`, and its
+ * own spacing utilities live in node_modules, which this build does not scan.
+ * All rules below share one specificity (`:where` adds none), so where two
+ * apply, the later one — the more specific relationship — wins.
  */
-/* Zero-specificity reset, so the rhythm rule right after it can win. */
-.md :where(p, ul, ol, blockquote) {
+.md {
+  --md-unit: var(--text-base);
+  --space-tight: calc(var(--md-unit) * 0.45);
+  --space-para: calc(var(--md-unit) * 0.85);
+  --space-block: calc(var(--md-unit) * 1.25);
+  --space-section: calc(var(--md-unit) * 1.9);
+}
+
+.md :where(p, ul, ol, li, blockquote, hr, h1, h2, h3, h4, h5, h6, [data-streamdown='code-block'], [data-streamdown='table-wrapper']) {
   margin: 0;
 }
 
 .md > div > * + * {
-  margin-top: 0.9em;
+  margin-top: var(--space-para);
+}
+
+/* Set-apart blocks get room on both sides. */
+.md > div > * + :where(blockquote, [data-streamdown='code-block'], [data-streamdown='table-wrapper']),
+.md > div > :where(blockquote, [data-streamdown='code-block'], [data-streamdown='table-wrapper'], .katex-display) + * {
+  margin-top: var(--space-block);
+}
+
+/* A line that introduces a list ("有以下几点：") stays with it. */
+.md > div > :where(p) + :where(ul, ol) {
+  margin-top: var(--space-tight);
+}
+
+/* Headings open a section… */
+.md > div > * + :where(h1, h2, hr),
+.md > div > :where(hr) + * {
+  margin-top: var(--space-section);
+}
+
+.md > div > * + :where(h3, h4) {
+  margin-top: calc(var(--space-section) * 0.8);
+}
+
+.md > div > * + :where(h5, h6) {
+  margin-top: var(--space-block);
+}
+
+/* …and belong to what follows them. */
+.md > div > :where(h1, h2, h3, h4, h5, h6) + * {
+  margin-top: var(--space-tight);
 }
 
 .md > div > :first-child {
   margin-top: 0;
-}
-
-.md > div > :last-child {
-  margin-bottom: 0;
-}
-
-/* A heading belongs to what follows it, so the gap below is the smaller one. */
-.md :is(h1, h2, h3, h4) + * {
-  margin-top: 0.5em;
 }
 
 /* --- Math ---------------------------------------------------------------- */
@@ -62,13 +103,23 @@
  * column — in compare mode a column is a third of the window.
  */
 .md .katex-display {
+  margin: var(--space-block) 0 0;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.2em 0;
 }
 
+.md > div > .katex-display:first-child {
+  margin-top: 0;
+}
+
 .md .katex {
   font-size: 1.08em;
+}
+
+/* A formula and the punctuation touching it; see `keepMathPunctuation`. */
+.md .md-nobr {
+  white-space: nowrap;
 }
 
 /* --- Headings ------------------------------------------------------------ */
@@ -76,7 +127,9 @@
 .md h1,
 .md h2,
 .md h3,
-.md h4 {
+.md h4,
+.md h5,
+.md h6 {
   font-weight: 600;
   line-height: var(--leading-tight);
   letter-spacing: -0.012em;
@@ -85,23 +138,31 @@
 
 .md h1 {
   font-size: var(--text-xl);
-  margin-top: 1.5em;
 }
 
 .md h2 {
   font-size: var(--text-lg);
-  margin-top: 1.4em;
 }
 
 .md h3 {
   font-size: var(--text-base);
-  margin-top: 1.3em;
 }
 
 .md h4 {
   font-size: var(--text-base);
   color: hsl(var(--ink-soft));
-  margin-top: 1.2em;
+}
+
+/*
+ * A short bold line standing alone ("**一、背景**") is how models mark a
+ * section without heading syntax; `leadHeadings` turns it into an h6. It keeps
+ * the look of bold body text and gains a heading's place in the rhythm.
+ */
+.md h5,
+.md h6 {
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
 }
 
 /* --- Text ---------------------------------------------------------------- */
@@ -131,7 +192,6 @@
 .md hr {
   border: none;
   border-top: 1px solid hsl(var(--line));
-  margin: 1.6em 0;
 }
 
 /* --- Lists --------------------------------------------------------------- */
@@ -154,8 +214,21 @@
   list-style: decimal outside;
 }
 
-.md li + li {
-  margin-top: 0.35em;
+/*
+ * Streamdown pads every item (`py-1`); the gap is set here instead, so a tight
+ * list reads as one group. A loose list — items with paragraphs of their
+ * own — is a list of small sections, and spaces like one.
+ */
+.md li {
+  padding-block: 0;
+}
+
+.md :where(li + li) {
+  margin-top: calc(var(--md-unit) * 0.3);
+}
+
+.md :where(ul, ol):has(> li > p) > :where(li + li) {
+  margin-top: var(--space-para);
 }
 
 .md li::marker {
@@ -166,9 +239,9 @@
   font-size: 0.85em;
 }
 
-/* Paragraphs and nested lists inside one item: the same rhythm, scaled down. */
-.md li > * + * {
-  margin-top: 0.45em;
+/* Paragraphs and nested lists inside one item belong to it: tight. */
+.md :where(li > * + *) {
+  margin-top: calc(var(--md-unit) * 0.3);
 }
 
 /* --- Blockquote ---------------------------------------------------------- */
@@ -180,7 +253,7 @@
 }
 
 .md blockquote > * + * {
-  margin-top: 0.6em;
+  margin-top: var(--space-tight);
 }
 
 /* --- Task lists ---------------------------------------------------------- */
@@ -200,7 +273,6 @@
 .md [data-streamdown='code-block'] {
   /* The anchor for the copy control, which Streamdown positions absolutely. */
   position: relative;
-  margin: 0.9em 0;
   border: 1px solid hsl(var(--line));
   border-radius: var(--radius-md);
   background: hsl(var(--surface));
@@ -322,10 +394,100 @@
 
 /* --- Tables -------------------------------------------------------------- */
 
+/*
+ * Streamdown builds a table as a padded card holding a toolbar row and, under
+ * it, a bordered scroll box. Its utilities from node_modules are only partly
+ * generated here — the scroll box's `border-border` names a colour this app
+ * does not define, so it drew a black frame inside the card, under an empty
+ * strip that existed only for the copy button. Reduced to one frame, the same
+ * as a code block's, with the copy control floating over the header row.
+ *
+ * The wrapper does not clip: the copy control opens a format menu that must be
+ * able to hang below it. The scroll box clips instead, and carries the radius.
+ */
 .md [data-streamdown='table-wrapper'] {
+  position: relative;
+  display: block;
+  padding: 0;
   border: 1px solid hsl(var(--line));
   border-radius: var(--radius-md);
-  overflow: hidden;
+  background: transparent;
+}
+
+.md [data-streamdown='table-wrapper'] > div:has(> table) {
+  border: none;
+  border-radius: calc(var(--radius-md) - 1px);
+  background: transparent;
+  overflow-x: auto;
+}
+
+/* The toolbar row, lifted out of the flow and over the header's right end. */
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)) {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 33px;
+  opacity: 0;
+  transition: opacity var(--dur-instant) var(--ease-out);
+}
+
+.md [data-streamdown='table-wrapper']:hover > div:not(:has(> table)),
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)):focus-within {
+  opacity: 1;
+}
+
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)) > div > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: hsl(var(--surface));
+  color: hsl(var(--ink-faint));
+  cursor: pointer;
+  transition:
+    color var(--dur-instant) var(--ease-out),
+    background-color var(--dur-instant) var(--ease-out);
+}
+
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)) > div > button:hover {
+  color: hsl(var(--ink));
+  background: hsl(var(--surface-hover));
+}
+
+/* The format menu (Markdown / CSV / TSV): a small popover in the app's style. */
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)) > div > div {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 128px;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: hsl(var(--paper));
+  box-shadow: var(--shadow-overlay);
+}
+
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)) > div > div > button {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 5px;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: hsl(var(--ink-soft));
+  cursor: pointer;
+}
+
+.md [data-streamdown='table-wrapper'] > div:not(:has(> table)) > div > div > button:hover {
+  color: hsl(var(--ink));
+  background: hsl(var(--surface-hover));
 }
 
 .md [data-streamdown='table'] {
@@ -368,8 +530,8 @@
   line-height: var(--leading-normal);
 }
 
-.md-compact > div > * + * {
-  margin-top: 0.7em;
+.md-compact {
+  --md-unit: calc(var(--text-sm) * 0.85);
 }
 
 .md-compact h1 {

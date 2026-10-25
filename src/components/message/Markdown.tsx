@@ -8,7 +8,9 @@ import { cn } from '@/lib/cn'
 import { openExternal } from '@/lib/open'
 import { getLanguage, useT } from '@/i18n/core'
 import { thread } from '@/i18n'
+import { leadHeadings } from '@/lib/lead-heading'
 import { normalizeMath } from '@/lib/math'
+import { keepMathPunctuation } from '@/lib/math-nobreak'
 
 /**
  * Assistant message body.
@@ -23,20 +25,42 @@ import { normalizeMath } from '@/lib/math'
  * The `cjk` plugin places `remark-cjk-friendly` *before* remark-gfm. That
  * ordering matters: without it, `**粗体：**` followed by Chinese punctuation
  * fails to parse as emphasis, which is the single most common markdown defect
- * in Chinese model output.
+ * in Chinese model output. `leadHeadings` rides along after it, so a bold
+ * line standing alone spaces like the section label it is.
  *
  * The `math` plugin renders KaTeX. Its parser only sees `$$…$$`;
  * `normalizeMath` first rewrites the `\(…\)`, `\[…\]` and `$…$` that models
  * actually write, so a lone dollar in a price is never read as a formula.
  */
 
+type Transformer = (tree: unknown, file: unknown) => unknown
+type Attacher = (this: unknown, options: unknown) => Transformer | void
+
+const katex = createMathPlugin({ errorColor: 'hsl(var(--ink-muted))' })
+const [rehypeKatex, katexOptions] = katex.rehypePlugin as [Attacher, unknown]
+
 const PLUGINS: PluginConfig = {
-  math: createMathPlugin({ errorColor: 'hsl(var(--ink-muted))' }),
+  math: {
+    ...katex,
+    // Streamdown takes one rehype plugin for math and runs it after its own
+    // sanitizer, so the punctuation pass rides in front of KaTeX here, where
+    // the class it adds survives.
+    rehypePlugin: [
+      function (this: unknown, options: unknown): Transformer {
+        const render = rehypeKatex.call(this, options)
+        return (tree, file) => {
+          keepMathPunctuation(tree as Parameters<typeof keepMathPunctuation>[0])
+          return render?.(tree, file)
+        }
+      },
+      katexOptions,
+    ],
+  },
   cjk: {
     name: 'cjk',
     type: 'cjk',
     remarkPlugins: [],
-    remarkPluginsAfter: [],
+    remarkPluginsAfter: [leadHeadings],
     // Must run before remark-gfm so emphasis parsing sees the CJK boundaries.
     remarkPluginsBefore: [remarkCjkFriendly],
   },
