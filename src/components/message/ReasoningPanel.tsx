@@ -15,7 +15,9 @@ import { thread } from '@/i18n'
  *   so the answer below does not get pushed down the page token by token.
  * - **When it finishes**, it folds to a single line ("已思考 12 秒"), because
  *   reasoning is rarely re-read and the answer always is.
- * - **On click**, it opens to the whole chain, still with the soft edges.
+ * - **On click** — while streaming too — it opens to the whole chain, still
+ *   with the soft edges. Open mid-stream, it keeps following the newest line
+ *   until the reader scrolls up to read something earlier.
  *
  * A model that streams no reasoning renders nothing here at all, which is the
  * same as before this existed.
@@ -40,11 +42,13 @@ export function ReasoningPanel({ text, streaming, durationMs, compact }: Reasoni
   const [open, setOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  // Whether the open view is scrolled to its end; reading further up unpins it.
+  const pinnedRef = useRef(true)
 
   // Keep the newest reasoning in view. `scrollTop` is set directly rather than
   // through scrollIntoView, which would also scroll the thread underneath.
   useEffect(() => {
-    if (!streaming || open) return
+    if (!streaming || (open && !pinnedRef.current)) return
     const node = scrollRef.current
     if (node) node.scrollTop = node.scrollHeight
   }, [text, streaming, open])
@@ -53,6 +57,7 @@ export function ReasoningPanel({ text, streaming, durationMs, compact }: Reasoni
   // concluded is what the answer was built from.
   useEffect(() => {
     if (open && endRef.current && scrollRef.current) {
+      pinnedRef.current = true
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [open])
@@ -73,11 +78,12 @@ export function ReasoningPanel({ text, streaming, durationMs, compact }: Reasoni
     <div className={cn('select-none', compact ? 'mb-2' : 'mb-2.5')}>
       <button
         type="button"
-        onClick={() => !streaming && setOpen((value) => !value)}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
         className={cn(
           'group flex items-center gap-1.5 rounded-[7px] py-1 pr-2 text-left',
           'text-[13px] text-ink-muted transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
-          !streaming && 'hover:text-ink-soft',
+          'hover:text-ink-soft',
         )}
       >
         <ChevronRight
@@ -118,6 +124,10 @@ export function ReasoningPanel({ text, streaming, durationMs, compact }: Reasoni
             'text-[13px] leading-[21px] text-ink-muted',
             fade && 'fade-both',
           )}
+          onScroll={(event) => {
+            const node = event.currentTarget
+            pinnedRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 24
+          }}
         >
           <div className="whitespace-pre-wrap break-words py-2">{text}</div>
           <div ref={endRef} />

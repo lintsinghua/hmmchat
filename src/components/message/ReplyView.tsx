@@ -254,7 +254,9 @@ export const ReplyView = memo(function ReplyView({
         </Markdown>
       ) : null}
 
-      {content.sources.length ? <Sources sources={content.sources} compact={compact} /> : null}
+      {/* Sources close the answer, so they wait for it: chips arriving mid-stream
+          would sit between the text and where it is still growing. */}
+      {content.sources.length && !streaming ? <Sources sources={content.sources} compact={compact} /> : null}
 
       {/* Actions appear on hover for mouse users and are always reachable by
           keyboard — no persistent toolbar competing with the text. */}

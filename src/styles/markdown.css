@@ -27,16 +27,32 @@
 
 /* --- Rhythm -------------------------------------------------------------- */
 
-.md > * + * {
+/*
+ * Blocks sit one level down: Streamdown wraps them all in a single `div`. Its
+ * own spacing on that wrapper (`space-y-4`) is a utility from node_modules,
+ * which this build does not scan — so the gap between paragraphs is set here,
+ * or there is none and a paragraph break reads like a plain line break.
+ */
+/* Zero-specificity reset, so the rhythm rule right after it can win. */
+.md :where(p, ul, ol, blockquote) {
+  margin: 0;
+}
+
+.md > div > * + * {
   margin-top: 0.9em;
 }
 
-.md > :first-child {
+.md > div > :first-child {
   margin-top: 0;
 }
 
-.md > :last-child {
+.md > div > :last-child {
   margin-bottom: 0;
+}
+
+/* A heading belongs to what follows it, so the gap below is the smaller one. */
+.md :is(h1, h2, h3, h4) + * {
+  margin-top: 0.5em;
 }
 
 /* --- Math ---------------------------------------------------------------- */
@@ -90,10 +106,6 @@
 
 /* --- Text ---------------------------------------------------------------- */
 
-.md p {
-  margin: 0;
-}
-
 .md strong {
   font-weight: 600;
   color: hsl(var(--ink));
@@ -127,7 +139,6 @@
 .md ul,
 .md ol {
   padding-left: 1.35em;
-  margin: 0;
 }
 
 /*
@@ -155,18 +166,21 @@
   font-size: 0.85em;
 }
 
-.md li > ul,
-.md li > ol {
-  margin-top: 0.35em;
+/* Paragraphs and nested lists inside one item: the same rhythm, scaled down. */
+.md li > * + * {
+  margin-top: 0.45em;
 }
 
 /* --- Blockquote ---------------------------------------------------------- */
 
 .md blockquote {
-  margin: 0;
   padding-left: 14px;
   border-left: 2px solid hsl(var(--line-strong));
   color: hsl(var(--ink-soft));
+}
+
+.md blockquote > * + * {
+  margin-top: 0.6em;
 }
 
 /* --- Task lists ---------------------------------------------------------- */
@@ -354,7 +368,7 @@
   line-height: var(--leading-normal);
 }
 
-.md-compact > * + * {
+.md-compact > div > * + * {
   margin-top: 0.7em;
 }
 

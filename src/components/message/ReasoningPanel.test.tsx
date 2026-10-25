@@ -44,4 +44,17 @@ describe('ReasoningPanel', () => {
     expect(container.querySelector('.fade-both')).not.toBeNull()
     expect(screen.getByText(/结论是数据模型优先/)).toBeTruthy()
   })
+
+  it('opens to the whole chain while still streaming', async () => {
+    const { container } = render(<ReasoningPanel text={CHAIN} streaming />)
+
+    await userEvent.click(screen.getByText('正在思考'))
+
+    // The fixed window gives way to the full, scrollable chain.
+    expect(container.querySelector('.fade-thinking')).toBeNull()
+    expect(container.querySelector('.fade-both')).not.toBeNull()
+
+    await userEvent.click(screen.getByText('正在思考'))
+    expect(container.querySelector('.fade-thinking')).not.toBeNull()
+  })
 })
