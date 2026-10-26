@@ -18,7 +18,7 @@ import { visibleLanes } from '@/chat/types'
 import { displayName } from '@/providers/registry'
 import * as db from '@/lib/db'
 import { useTheme } from '@/hooks/useTheme'
-import { useCompact, useTouch } from '@/hooks/useMedia'
+import { COMPACT_QUERY, matchesNow, useCompact, useTouch } from '@/hooks/useMedia'
 import { useViewportHeight } from '@/hooks/useViewportHeight'
 import { useBackButton } from '@/hooks/useBackButton'
 import { cn } from '@/lib/cn'
@@ -84,8 +84,16 @@ export function App() {
   useEffect(() => {
     if (wasCompact.current === compact) return
     wasCompact.current = compact
-    setSidebarOpen(!compact)
+    setSidebarOpen(!compact && !useStore.getState().settings.sidebarCollapsed)
   }, [compact, setSidebarOpen])
+  // On a wide window, hiding the list is a preference and outlasts a restart.
+  // The drawer's open and shut is not: a phone always opens on the chat.
+  useEffect(() => {
+    if (!booted || compact) return
+    if (Boolean(settings.sidebarCollapsed) !== !sidebarOpen) {
+      useStore.getState().setSettings({ sidebarCollapsed: !sidebarOpen })
+    }
+  }, [sidebarOpen, compact, booted, settings.sidebarCollapsed])
   // On a phone the drawer covers the chat, so anything picked in it closes it.
   const closeDrawer = useCallback(() => {
     if (compact) setSidebarOpen(false)
@@ -119,6 +127,7 @@ export function App() {
       const stored = await db.getSetting<PersistedSettings>('settings', settings)
       if (cancelled) return
       useStore.getState().setSettings(stored)
+      if (stored.sidebarCollapsed && !matchesNow(COMPACT_QUERY)) setSidebarOpen(false)
 
       await loadProviders()
       await refreshSummaries()
@@ -214,6 +223,8 @@ export function App() {
       query={query}
       onQueryChange={setQuery}
       compact={compact}
+      onCollapse={() => setSidebarOpen(false)}
+      collapseShortcut={sidebarHint}
       onSelect={(id) => {
         closeDrawer()
         void openConversation(id)

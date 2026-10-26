@@ -1,4 +1,4 @@
-import { Copy, MessageSquareQuote, MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Settings, Trash2 } from 'lucide-react'
+import { Copy, MessageSquareQuote, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff, Plus, Search, Settings, Trash2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { ConversationSummary } from '@/lib/db'
@@ -7,6 +7,7 @@ import { useStore } from '@/chat/store'
 import { resolveShortcuts } from '@/components/palette/CommandPalette'
 import { formatBindingText } from '@/lib/shortcuts'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { Button } from '@/components/ui/Button'
 import { Popover, PopoverContent, PopoverItem, PopoverSeparator, PopoverTrigger } from '@/components/ui/Popover'
 import { useTouch } from '@/hooks/useMedia'
 import { useT, type Entry } from '@/i18n/core'
@@ -41,6 +42,9 @@ interface SidebarProps {
   onOpenSettings: () => void
   /** Shown as the phone drawer rather than beside the thread. */
   compact?: boolean
+  /** Hides the list beside the thread; the title bar's toggle brings it back. */
+  onCollapse?: () => void
+  collapseShortcut?: string
 }
 
 export function Sidebar({
@@ -57,6 +61,8 @@ export function Sidebar({
   onQuote,
   onOpenSettings,
   compact = false,
+  onCollapse,
+  collapseShortcut,
 }: SidebarProps) {
   const t = useT()
   const groups = useMemo(() => groupByDate(summaries), [summaries])
@@ -75,10 +81,23 @@ export function Sidebar({
         The title bar is an overlay, so the macOS traffic lights float over this
         region. The top padding reserves their space; the strip itself is a drag
         handle so the window can be moved by the sidebar. In the drawer it only
-        clears the status bar.
+        clears the status bar. The hide toggle sits at the far end, clear of the
+        traffic lights, where the title bar's show toggle appears once it is gone.
       */}
       <div data-tauri-drag-region className="pt-safe shrink-0">
-        <div className={compact ? 'h-3' : 'h-[38px]'} />
+        {compact ? (
+          <div className="h-3" />
+        ) : (
+          <div data-tauri-drag-region className="flex h-[38px] items-center justify-end px-2.5">
+            {onCollapse ? (
+              <Tooltip label={t(app.hideSidebar)} shortcut={collapseShortcut}>
+                <Button size="icon-sm" onClick={onCollapse} aria-label={t(app.hideSidebar)}>
+                  <PanelLeft className="h-[15px] w-[15px]" strokeWidth={1.75} />
+                </Button>
+              </Tooltip>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-1 px-2.5 pb-2">

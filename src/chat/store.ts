@@ -54,6 +54,8 @@ export interface PersistedSettings {
   /** Names a new conversation from its first message. */
   autoTitle: boolean
   sidebarWidth: number
+  /** The sidebar was last hidden on a wide window; a phone always opens on the chat. */
+  sidebarCollapsed?: boolean
   /** Binding per action; a missing entry means the action's default. */
   shortcuts?: ShortcutMap
   /**

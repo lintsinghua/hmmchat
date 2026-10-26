@@ -1,7 +1,7 @@
 {
   "name": "hmmchat",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A lightweight, native-feeling macOS chat client that puts more than one model side by side on the same question.",
   "packageManager": "pnpm@10.33.0",
   "scripts": {

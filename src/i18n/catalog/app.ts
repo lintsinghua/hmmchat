@@ -4,6 +4,7 @@ import type { Entry } from '../core'
 export const app = {
   // Title bar
   showSidebar: { en: 'Show sidebar', zh: '显示侧栏' },
+  hideSidebar: { en: 'Hide sidebar', zh: '收起侧栏' },
   showChats: { en: 'Chats', zh: '对话列表' },
   close: { en: 'Close', zh: '关闭' },
 
