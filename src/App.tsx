@@ -133,8 +133,11 @@ export function App() {
       await loadProviders()
       await refreshSummaries()
 
+      // A wide window picks up where it left off. A phone opens on a fresh chat,
+      // the way a messaging app does after the system has closed it; the first
+      // send creates the conversation, so no empty one is left in the list.
       const list = useStore.getState().summaries
-      if (list[0]) await openConversation(list[0].id)
+      if (list[0] && !matchesNow(COMPACT_QUERY)) await openConversation(list[0].id)
       // Nothing to reopen: the composer starts as a new conversation would.
       else useStore.getState().restoreComposer(newConversationPrefs(useStore.getState().settings))
 
