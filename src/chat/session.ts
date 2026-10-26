@@ -257,6 +257,14 @@ export async function sendMessage(text: string, attachments: Attachment[] = []):
 
   for (const reply of replies) useStore.getState().startLive(reply)
 
+  // What a new conversation follows when no default model is set, kept with the
+  // settings so it outlasts the app being closed.
+  const used = useStore.getState().composerModel ?? targets[0].model
+  const last = useStore.getState().settings.lastModel
+  if (last?.providerId !== used.providerId || last?.modelId !== used.modelId) {
+    useStore.getState().setSettings({ lastModel: { providerId: used.providerId, modelId: used.modelId } })
+  }
+
   if (!(await persistAndStart(nextGraph, turn, replies))) return
 
   // Sending bumps `updated_at`, which reorders the sidebar; reflect it now

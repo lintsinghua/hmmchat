@@ -51,6 +51,11 @@ describe('inferCapabilities', () => {
     expect(inferCapabilities('gemini-3-pro').thinking).not.toBe('none')
   })
 
+  it('treats a Gemini newer than the catalog as reasoning by level', () => {
+    expect(inferCapabilities('gemini-4-argon').thinking).toBe('level')
+    expect(inferCapabilities('google/gemini-4-argon').thinking).toBe('level')
+  })
+
   it('takes a no-reasoning row at its word', () => {
     expect(inferCapabilities('gpt-4o').thinking).toBe('none')
   })

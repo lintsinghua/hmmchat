@@ -138,8 +138,12 @@ export function App() {
       // send creates the conversation, so no empty one is left in the list.
       const list = useStore.getState().summaries
       if (list[0] && !matchesNow(COMPACT_QUERY)) await openConversation(list[0].id)
-      // Nothing to reopen: the composer starts as a new conversation would.
-      else useStore.getState().restoreComposer(newConversationPrefs(useStore.getState().settings))
+      // Nothing to reopen: the composer starts as a new conversation would,
+      // with the model last sent to when no default model is set.
+      else {
+        useStore.getState().restoreComposer(newConversationPrefs(useStore.getState().settings))
+        if (!stored.defaultModel && stored.lastModel) useStore.getState().setComposerModel(stored.lastModel)
+      }
 
       if (!cancelled) setBooted(true)
     })()

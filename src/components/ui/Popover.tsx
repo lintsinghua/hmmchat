@@ -72,6 +72,13 @@ export function PopoverContent({
         align={align}
         side={side}
         sideOffset={sideOffset}
+        // Radix focuses the first item on open, and WebKit draws that as a focus
+        // ring around a row nobody chose — after a tap and after a click alike.
+        // The panel itself takes focus instead; Tab still walks into the items.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          ;(event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true })
+        }}
         // Handing focus back to the trigger is for keyboard navigation. After a
         // tap it only draws a focus ring around the button just let go of.
         onCloseAutoFocus={(event) => {
@@ -88,7 +95,7 @@ export function PopoverContent({
             : 'var(--radix-popover-content-available-height)',
         }}
         className={cn(
-          'z-50 origin-[var(--radix-popover-content-transform-origin)]',
+          'z-50 origin-[var(--radix-popover-content-transform-origin)] outline-none',
           'overflow-y-auto overscroll-contain rounded-[var(--radius-md)] border border-line bg-paper p-1',
           'shadow-[var(--shadow-overlay)]',
           'data-[state=open]:animate-pop-in',

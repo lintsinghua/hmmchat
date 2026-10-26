@@ -106,8 +106,10 @@ const FALLBACK: Array<{ test: RegExp; capabilities: Partial<Capabilities> }> = [
   { test: /^gpt-/, capabilities: { vision: true } },
 
   // --- Google --------------------------------------------------------------
+  // Gemini 3 moved depth to named levels, and every generation since has kept
+  // them: a Gemini 4 the catalog has not caught up with still reasons.
   {
-    test: /^gemini-3/,
+    test: /^gemini-([3-9]|\d{2,})/,
     capabilities: {
       thinking: 'level',
       reasoning: [{ kind: 'effort', values: ['minimal', 'low', 'medium', 'high'] }],

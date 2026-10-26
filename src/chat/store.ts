@@ -64,6 +64,11 @@ export interface PersistedSettings {
    * carries on from its own last send.
    */
   defaultModel?: ModelRef
+  /**
+   * The model the last message was sent with, which is what "the last one
+   * used" means once the app has been closed and nothing is open to read it off.
+   */
+  lastModel?: ModelRef
   /** Models compared alongside it from the first message. */
   defaultCompareModels?: ModelRef[]
   defaultSearch: SearchMode
