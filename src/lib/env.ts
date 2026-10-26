@@ -5,6 +5,14 @@ export const isTauri: boolean =
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
 /**
+ * True when the window's title bar is an overlay with the macOS traffic lights
+ * floating over the top-left corner. An iPad also reports "Macintosh" in its
+ * user agent, so a touch screen rules it out.
+ */
+export const hasTrafficLights: boolean =
+  isTauri && /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints === 0
+
+/**
  * Base URL of the local mock provider used by `pnpm mock`.
  *
  * In the browser (no Tauri) there is no Rust proxy, so provider requests are

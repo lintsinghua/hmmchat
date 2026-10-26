@@ -17,6 +17,7 @@ import {
 import { visibleLanes } from '@/chat/types'
 import { displayName } from '@/providers/registry'
 import * as db from '@/lib/db'
+import { hasTrafficLights } from '@/lib/env'
 import { useTheme } from '@/hooks/useTheme'
 import { COMPACT_QUERY, matchesNow, useCompact, useTouch } from '@/hooks/useMedia'
 import { useViewportHeight } from '@/hooks/useViewportHeight'
@@ -393,7 +394,12 @@ function TitleBar({
     <div
       data-tauri-drag-region
       // A tablet has a status bar over the top edge, where a Mac has none.
-      className="pt-safe flex h-[calc(38px+env(safe-area-inset-top,0px))] shrink-0 items-center gap-1 px-3"
+      // With the sidebar hidden the traffic lights sit over this strip, so the
+      // show toggle starts after them.
+      className={cn(
+        'pt-safe flex h-[calc(38px+env(safe-area-inset-top,0px))] shrink-0 items-center gap-1 px-3',
+        hasTrafficLights && !sidebarOpen && 'pl-[78px]',
+      )}
     >
       {!sidebarOpen ? (
         <Tooltip label={t(app.showSidebar)} shortcut={sidebarShortcut}>
