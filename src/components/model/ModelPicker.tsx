@@ -80,7 +80,7 @@ export function ModelPicker({
   return (
     <Popover>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align={align} side={side} width={300} className="max-h-[420px] overflow-y-auto">
+      <PopoverContent align={align} side={side} width={300} maxHeight={420}>
         {grouped.length === 0 ? (
           <div className="px-2 py-3 text-[13px] text-ink-muted">
             {t(composer.noModels)}

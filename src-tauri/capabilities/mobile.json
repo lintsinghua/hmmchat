@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Permissions for the main window on iOS and Android: SQL storage, opening links in the system browser, and leaving the app from the Android back button.",
+  "platforms": ["iOS", "android"],
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:app:allow-exit",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-select",
+    "sql:allow-execute",
+    "opener:default",
+    "opener:allow-open-url"
+  ]
+}

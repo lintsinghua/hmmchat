@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  GitBranch,
   Maximize2,
   RefreshCw,
   Square,
@@ -46,6 +47,12 @@ interface ReplyViewProps {
   /** Set when this answer came from an ancestor lane rather than this model. */
   inheritedFrom?: Lane
   onRegenerate: () => void
+  /**
+   * Starts a new chat holding the conversation up to and including this round.
+   * It sits with the answer rather than the question because the answer is
+   * where the round ends: what the new chat carries on from is in view.
+   */
+  onFork: () => void
   /** Shows this column on its own (compare mode only). */
   onFocus?: () => void
   onStop: () => void
@@ -102,6 +109,7 @@ export const ReplyView = memo(function ReplyView({
   laneCount,
   inheritedFrom,
   onRegenerate,
+  onFork,
   onFocus,
   onStop,
   versions,
@@ -200,7 +208,7 @@ export const ReplyView = memo(function ReplyView({
                 className={cn(
                   'ml-auto flex h-5 w-5 items-center justify-center rounded-[5px] text-ink-faint',
                   'opacity-0 transition-opacity duration-[var(--dur-instant)] ease-[var(--ease-out)]',
-                  'hover:bg-surface-hover hover:text-ink group-hover/reply:opacity-100 focus-visible:opacity-100',
+                  'hover:bg-surface-hover hover:text-ink group-hover/reply:opacity-100 focus-visible:opacity-100 touch:opacity-100',
                 )}
               >
                 <Maximize2 className="h-3 w-3" strokeWidth={2} />
@@ -266,6 +274,8 @@ export const ReplyView = memo(function ReplyView({
             'mt-2 flex items-center gap-0.5',
             'opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out)]',
             'group-hover/reply:opacity-100 focus-within:opacity-100',
+            // No hover on a phone: the actions are simply there, quieter.
+            'touch:opacity-70',
           )}
         >
           <Tooltip label={copied ? t(thread.copied) : t(thread.copy)}>
@@ -281,6 +291,12 @@ export const ReplyView = memo(function ReplyView({
           <Tooltip label={t(thread.regenerate)}>
             <Button size="icon-sm" onClick={onRegenerate} aria-label={t(thread.regenerate)}>
               <RefreshCw className="h-[15px] w-[15px]" strokeWidth={1.75} />
+            </Button>
+          </Tooltip>
+
+          <Tooltip label={t(thread.forkHere)} shortcut={t(thread.forkHereHint)}>
+            <Button size="icon-sm" onClick={onFork} aria-label={t(thread.forkHere)}>
+              <GitBranch className="h-[15px] w-[15px]" strokeWidth={1.75} />
             </Button>
           </Tooltip>
 
@@ -317,7 +333,7 @@ export const ReplyView = memo(function ReplyView({
       ) : null}
 
       {streaming && content.text ? (
-        <div className="mt-2 flex items-center gap-0.5 opacity-0 transition-opacity duration-[var(--dur-fast)] group-hover/reply:opacity-100">
+        <div className="mt-2 flex items-center gap-0.5 opacity-0 transition-opacity duration-[var(--dur-fast)] group-hover/reply:opacity-100 touch:opacity-70">
           <Tooltip label={t(thread.stop)}>
             <Button size="icon-sm" onClick={onStop} aria-label={t(thread.stopGenerating)}>
               <Square className="h-[13px] w-[13px] fill-current" strokeWidth={1.75} />

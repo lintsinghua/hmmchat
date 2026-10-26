@@ -42,7 +42,7 @@ giving up the calm.
 <td><img src="docs/quote.jpg" alt="Quoting rounds of an earlier chat as context"></td>
 </tr>
 <tr>
-<td><sub><b>Branch from any question.</b> A side question continues in its own chat, holding everything up to that point.</sub></td>
+<td><sub><b>Branch from any answer.</b> A side question continues in its own chat, holding everything up to that point.</sub></td>
 <td><sub><b>Quote an earlier chat.</b> Tick the rounds to bring in, and quote one model's answers when the source had several.</sub></td>
 </tr>
 </table>
@@ -61,7 +61,7 @@ giving up the calm.
 - **Removing a model loses nothing** — the × on a chip keeps the column's
   answers: *Undo* brings it straight back, and the Compare menu lists it under
   *Removed* with its rounds. Re-adding that model returns the same column.
-- **Branch from any question** — cut the chat at a turn and carry on in a new
+- **Branch from any answer** — cut the chat after a round and carry on in a new
   one holding every answer up to that point, so a side question never derails
   the thread it came from. Turns keep their branches too: edit a question and
   the original stays, one click away.

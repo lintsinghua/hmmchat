@@ -1,6 +1,7 @@
 import { Popover as RadixPopover } from 'radix-ui'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { matchesNow, TOUCH_QUERY } from '@/hooks/useMedia'
 
 /**
  * Popover wrapper.
@@ -41,10 +42,18 @@ export const PopoverAnchor = RadixPopover.Anchor
 interface ContentProps {
   children: ReactNode
   className?: string
+  /** Radix's hook for where focus goes on close; prevent it to keep focus where an item put it. */
+  onCloseAutoFocus?: (event: Event) => void
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right'
   sideOffset?: number
   width?: number | string
+  /**
+   * The tallest the panel gets. It is also never taller than the room Radix
+   * finds beside its trigger, so a long list over a phone's keyboard scrolls
+   * inside the panel instead of running off the top of the screen.
+   */
+  maxHeight?: number
 }
 
 export function PopoverContent({
@@ -54,6 +63,8 @@ export function PopoverContent({
   side = 'bottom',
   sideOffset = 6,
   width,
+  onCloseAutoFocus,
+  maxHeight,
 }: ContentProps) {
   return (
     <RadixPopover.Portal>
@@ -61,10 +72,24 @@ export function PopoverContent({
         align={align}
         side={side}
         sideOffset={sideOffset}
-        style={width ? { width } : undefined}
+        // Handing focus back to the trigger is for keyboard navigation. After a
+        // tap it only draws a focus ring around the button just let go of.
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          if (matchesNow(TOUCH_QUERY)) event.preventDefault()
+        }}
+        // A 340px panel on a 375px phone: kept off the screen edges, and never
+        // wider than the screen less that margin.
+        collisionPadding={8}
+        style={{
+          ...(width ? { width: typeof width === 'number' ? `min(${width}px, calc(100vw - 16px))` : width } : null),
+          maxHeight: maxHeight
+            ? `min(${maxHeight}px, var(--radix-popover-content-available-height))`
+            : 'var(--radix-popover-content-available-height)',
+        }}
         className={cn(
           'z-50 origin-[var(--radix-popover-content-transform-origin)]',
-          'rounded-[var(--radius-md)] border border-line bg-paper p-1',
+          'overflow-y-auto overscroll-contain rounded-[var(--radius-md)] border border-line bg-paper p-1',
           'shadow-[var(--shadow-overlay)]',
           'data-[state=open]:animate-pop-in',
           'data-[state=closed]:opacity-0',
@@ -77,27 +102,35 @@ export function PopoverContent({
   )
 }
 
-/** A row inside a popover. Selected state is a subtle fill, never a border. */
+/**
+ * A row inside a popover. Selected state is a subtle fill, never a border.
+ *
+ * Picking a row closes the popover, unless `closeOnSelect` is false (see the
+ * note at the top). A menu left open after a pick looked like the pick had not
+ * registered, and on a phone it also needed a second tap outside to dismiss.
+ */
 export function PopoverItem({
   children,
   selected,
   onSelect,
   className,
   disabled,
+  closeOnSelect = true,
 }: {
   children: ReactNode
   selected?: boolean
   onSelect?: () => void
   className?: string
   disabled?: boolean
+  closeOnSelect?: boolean
 }) {
-  return (
+  const item = (
     <button
       type="button"
       disabled={disabled}
       onClick={onSelect}
       className={cn(
-        'flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-sm',
+        'flex w-full items-center gap-2 rounded-[7px] px-2 py-1.5 text-left text-sm touch:py-2.5',
         'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
         'disabled:pointer-events-none disabled:opacity-40',
         selected ? 'bg-surface-active text-ink' : 'text-ink-soft hover:bg-surface-hover hover:text-ink',
@@ -107,6 +140,7 @@ export function PopoverItem({
       {children}
     </button>
   )
+  return closeOnSelect ? <RadixPopover.Close asChild>{item}</RadixPopover.Close> : item
 }
 
 export function PopoverLabel({ children }: { children: ReactNode }) {

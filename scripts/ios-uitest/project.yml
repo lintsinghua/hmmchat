@@ -1,0 +1,30 @@
+# A UI-test harness for the iOS build, run on a simulator against the app
+# already installed there (by `pnpm tauri ios dev`). It drives real touches and
+# the real software keyboard, which a desktop browser cannot emulate.
+#
+#   xcodegen generate --spec scripts/ios-uitest/project.yml
+#   xcodebuild test -project scripts/ios-uitest/HmmChatUITests.xcodeproj \
+#     -scheme HmmChatUITests -destination 'platform=iOS Simulator,name=iPhone 17'
+name: HmmChatUITests
+options:
+  bundleIdPrefix: com.hmmchat
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  HmmChatUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests]
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_IDENTITY: "-"
+      DEVELOPMENT_TEAM: ""
+      SWIFT_VERSION: "5.0"
+schemes:
+  HmmChatUITests:
+    build:
+      targets:
+        HmmChatUITests: [test]
+    test:
+      targets: [HmmChatUITests]

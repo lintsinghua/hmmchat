@@ -2,11 +2,21 @@
 <html lang="zh-CN" class="h-full">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover lets the phone shell paint under the notch and the home
+      indicator (the safe-area insets pad it back); maximum-scale=1 stops iOS
+      zooming the page whenever a text field smaller than 16px takes focus;
+      interactive-widget makes Android shrink the layout for the keyboard.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <title>HmmChat</title>
   </head>
   <body class="h-full">
-    <div id="root" class="h-full"></div>
+    <!-- No height class here: #root is sized to --app-height (useViewportHeight). -->
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -15,12 +15,21 @@ import type { DragEvent, PointerEvent, RefObject } from 'react'
  *    surface (e.g. composer chips and thread columns moving together).
  * 3. On release, the dragged item glides smoothly from the pointer back into
  *    its settled slot (`220ms cubic-bezier(0.22, 1, 0.36, 1)`).
+ *
+ * A finger is different: the rows this reorders (composer chips, lane tabs)
+ * also scroll sideways on a phone, and a horizontal swipe has to stay a scroll.
+ * So a touch only picks the item up after it has been held still for a moment,
+ * and from then on the page is kept from scrolling until it is let go.
  */
 
 const DRAG_THRESHOLD_PX = 4
 const FLIP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const FLIP_DURATION_MS = 260
 const SETTLE_DURATION_MS = 220
+/** How long a finger rests on an item before it lifts for reordering. */
+const LONG_PRESS_MS = 380
+/** Movement during the press that reads as a scroll instead, and cancels it. */
+const LONG_PRESS_SLOP_PX = 8
 
 interface ActiveDrag {
   id: string
@@ -181,6 +190,8 @@ export function useLaneReorder<T extends HTMLElement = HTMLDivElement>({
         const prevCursor = document.body.style.cursor
         let active = false
         let lastOverTarget: EventTarget | null = null
+        const touch = event.pointerType === 'touch'
+        let pressTimer = 0
 
         const startDrag = () => {
           const container = containerRef.current
@@ -226,19 +237,37 @@ export function useLaneReorder<T extends HTMLElement = HTMLDivElement>({
           return true
         }
 
+        const activate = () => {
+          if (!startDrag()) return false
+          active = true
+          updateDragState(id)
+          document.body.style.userSelect = 'none'
+          document.body.style.cursor = 'grabbing'
+          window.getSelection?.()?.removeAllRanges?.()
+          return true
+        }
+
+        // Only once an item is held does the page stop scrolling under the
+        // finger; before that a swipe is left to scroll the row.
+        const holdScroll = (touchEvent: TouchEvent) => {
+          if (active) touchEvent.preventDefault()
+        }
+        // Android opens a context menu on a long press, iOS a callout.
+        const holdMenu = (menuEvent: Event) => menuEvent.preventDefault()
+
         const onPointerMove = (moveEvent: globalThis.PointerEvent) => {
           const dx = moveEvent.clientX - startX
           const dy = moveEvent.clientY - startY
 
           if (!active) {
+            if (touch) {
+              // Moved before the press completed: this is a scroll.
+              if (Math.hypot(dx, dy) > LONG_PRESS_SLOP_PX) finish()
+              return
+            }
             if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
             if (Math.abs(dy) > Math.abs(dx) * 1.5) return
-            if (!startDrag()) return
-            active = true
-            updateDragState(id)
-            document.body.style.userSelect = 'none'
-            document.body.style.cursor = 'grabbing'
-            window.getSelection?.()?.removeAllRanges?.()
+            if (!activate()) return
           }
 
           const container = containerRef.current
@@ -338,6 +367,9 @@ export function useLaneReorder<T extends HTMLElement = HTMLDivElement>({
         }
 
         const finish = () => {
+          window.clearTimeout(pressTimer)
+          window.removeEventListener('touchmove', holdScroll)
+          window.removeEventListener('contextmenu', holdMenu)
           window.removeEventListener('pointermove', onPointerMove)
           window.removeEventListener('pointerup', finish)
           window.removeEventListener('pointercancel', finish)
@@ -367,6 +399,18 @@ export function useLaneReorder<T extends HTMLElement = HTMLDivElement>({
         }
 
         cleanupRef.current = () => finish()
+        if (touch) {
+          window.addEventListener('touchmove', holdScroll, { passive: false })
+          window.addEventListener('contextmenu', holdMenu)
+          pressTimer = window.setTimeout(() => {
+            if (!activate()) {
+              finish()
+              return
+            }
+            // A short tick, where the platform offers one, says it has lifted.
+            navigator.vibrate?.(8)
+          }, LONG_PRESS_MS)
+        }
         window.addEventListener('pointermove', onPointerMove)
         window.addEventListener('pointerup', finish)
         window.addEventListener('pointercancel', finish)

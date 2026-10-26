@@ -4,6 +4,8 @@ mod secrets;
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+// iOS and Android start the app from a library entry point rather than `main`.
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
         Migration {
@@ -38,9 +40,13 @@ pub fn run() {
         },
     ];
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    // Window size and position mean nothing on a phone, where the one window is
+    // the screen; the plugin is desktop-only.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
+    builder
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:hmmchat.db", migrations)

@@ -101,7 +101,7 @@ export function Thread({ graph }: { graph: ConversationGraph }) {
         key={focused?.id ?? 'all'}
         scrollClassName="overflow-auto"
         className={cn(
-          'mx-auto flex w-full flex-col gap-8 px-6 pb-8 pt-4 animate-fade-in',
+          'mx-auto flex w-full flex-col gap-8 px-6 pb-8 pt-4 animate-fade-in max-md:gap-7 max-md:px-4 max-md:pt-2',
           lanes.length > 1 ? null : 'max-w-[880px]',
         )}
         style={lanes.length > 1 ? { maxWidth: lanes.length * 560 } : undefined}
@@ -169,6 +169,12 @@ function TurnBlock({
   const perColumn = (width - skipped.size * SKIPPED_COLUMN_WIDTH) / Math.max(1, answering.length)
   const useTabs = answering.length > 1 && width > 0 && perColumn < MIN_COLUMN_WIDTH
   const shown = useTabs ? [answering[Math.min(activeTab, answering.length - 1)]] : lanes
+  // On a phone the tabs are the comparison, and a sideways swipe across the
+  // answer moves to the next model's, like paging.
+  const swipe = useSwipeTabs((step) => {
+    const next = activeTab + step
+    if (next >= 0 && next < answering.length) setActiveLaneId(answering[next].id)
+  })
 
   const {
     containerRef: gridRef,
@@ -186,7 +192,6 @@ function TurnBlock({
       <UserMessage
         turn={turn}
         onEdit={(text) => void editTurn(turn.id, text)}
-        onFork={() => void forkFromTurn(turn.id)}
         siblingInfo={
           siblings.length > 1
             ? {
@@ -210,6 +215,7 @@ function TurnBlock({
 
       <div
         ref={gridRef}
+        {...(useTabs ? swipe : {})}
         className="grid gap-x-6 gap-y-6"
         style={
           shown.length > 1
@@ -341,6 +347,7 @@ function LaneColumn({
       }
       onFocus={onFocus}
       onRegenerate={() => void regenerate(turn.id, lane.id)}
+      onFork={() => void forkFromTurn(turn.id)}
       onStop={() => stopLane(lane.id)}
       versions={versions.length > 1 ? versions : undefined}
       onSelectVersion={(replyId) => void selectReplyVersion(turn.id, lane.id, replyId)}
@@ -377,29 +384,33 @@ function LaneTabs({
   const current = lanes[Math.min(active, lanes.length - 1)]
   const viewAlone = t(thread.viewAlone, { model: displayName(current.model.modelId) })
   return (
-    <div ref={tabsRef} className="flex items-center gap-1 border-b border-line pb-2">
-      {lanes.map((lane, index) => (
-        <button
-          key={lane.id}
-          type="button"
-          {...(lanes.length > 1 ? getTabProps(lane.id) : {})}
-          onClick={() => onChange(index)}
-          className={cn(
-            'relative flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] font-medium',
-            'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
-            lanes.length > 1 && 'cursor-grab select-none active:cursor-grabbing',
-            active === index ? 'text-ink' : 'text-ink-muted hover:text-ink-soft',
-            draggingLaneId === lane.id &&
-              'bg-paper text-ink shadow-[var(--shadow-raised)] ring-1 ring-inset ring-line-strong',
-          )}
-        >
-          <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5" />
-          {displayName(lane.model.modelId)}
-          {active === index ? (
-            <span className="absolute inset-x-1.5 -bottom-[9px] h-[1.5px] rounded-full bg-ink" />
-          ) : null}
-        </button>
-      ))}
+    <div className="flex items-center gap-1 border-b border-line pb-2">
+      {/* Scrolls sideways when four model names are wider than a phone. */}
+      <div ref={tabsRef} className="no-scrollbar -mb-[10px] flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-[10px]">
+        {lanes.map((lane, index) => (
+          <button
+            key={lane.id}
+            type="button"
+            {...(lanes.length > 1 ? getTabProps(lane.id) : {})}
+            onClick={() => onChange(index)}
+            className={cn(
+              'relative flex shrink-0 items-center gap-1.5 rounded-[6px] px-2 py-1 text-[12.5px] font-medium',
+              'touch:px-2.5 touch:py-1.5 touch:text-[13.5px]',
+              'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
+              lanes.length > 1 && 'cursor-grab select-none active:cursor-grabbing',
+              active === index ? 'text-ink' : 'text-ink-muted hover:text-ink-soft',
+              draggingLaneId === lane.id &&
+                'bg-paper text-ink shadow-[var(--shadow-raised)] ring-1 ring-inset ring-line-strong',
+            )}
+          >
+            <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5" />
+            {displayName(lane.model.modelId)}
+            {active === index ? (
+              <span className="absolute inset-x-1.5 -bottom-[9px] h-[1.5px] rounded-full bg-ink" />
+            ) : null}
+          </button>
+        ))}
+      </div>
       <Tooltip label={viewAlone}>
         <Button
           size="icon-sm"
@@ -411,6 +422,44 @@ function LaneTabs({
         </Button>
       </Tooltip>
     </div>
+  )
+}
+
+/**
+ * A horizontal swipe, read from touch events on the element it is spread on.
+ *
+ * Mostly-sideways and long enough to be deliberate, so reading down an answer
+ * never flips the tab. A swipe that starts inside something that scrolls
+ * sideways of its own — a code block, a wide table, a formula — is that
+ * element's, not the tabs'.
+ */
+function useSwipeTabs(onStep: (step: 1 | -1) => void) {
+  const start = useRef<{ x: number; y: number } | null>(null)
+  const onStepRef = useRef(onStep)
+  onStepRef.current = onStep
+
+  return useMemo(
+    () => ({
+      onTouchStart: (event: React.TouchEvent) => {
+        const touch = event.touches[0]
+        const scroller = (event.target as HTMLElement).closest?.('pre, [data-streamdown="table-wrapper"], .katex-display')
+        // The left edge is the drawer's swipe.
+        const edge = touch.clientX <= 32
+        start.current =
+          event.touches.length === 1 && !scroller && !edge ? { x: touch.clientX, y: touch.clientY } : null
+      },
+      onTouchEnd: (event: React.TouchEvent) => {
+        const from = start.current
+        start.current = null
+        const touch = event.changedTouches[0]
+        if (!from || !touch) return
+        const dx = touch.clientX - from.x
+        const dy = touch.clientY - from.y
+        if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 2) return
+        onStepRef.current(dx < 0 ? 1 : -1)
+      },
+    }),
+    [],
   )
 }
 

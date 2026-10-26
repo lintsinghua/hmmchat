@@ -1,7 +1,7 @@
 {
   "name": "hmmchat",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A lightweight, native-feeling macOS chat client that puts more than one model side by side on the same question.",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -17,7 +17,9 @@
     "app:build": "tauri build",
     "verify:streams": "node scripts/verify-streams.mjs",
     "verify:ui": "node scripts/shoot.mjs",
+    "verify:mobile": "node scripts/shoot-mobile.mjs",
     "icon": "tauri icon src-tauri/icon-src.png",
+    "icon:mobile": "node scripts/make-mobile-icons.mjs",
     "check": "tsc --noEmit && vitest run",
     "sync:catalog": "node scripts/sync-model-catalog.mjs"
   },

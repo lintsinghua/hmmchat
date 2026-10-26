@@ -16,6 +16,7 @@ import type { ProviderConfig } from '@/providers/registry'
 import type { SearchMode } from './types'
 import { defaultShortcuts, type ShortcutMap } from '@/lib/shortcuts'
 import type { Language } from '@/i18n/core'
+import { COMPACT_QUERY, matchesNow } from '@/hooks/useMedia'
 
 /**
  * Application state.
@@ -154,6 +155,7 @@ interface State {
   restoreComposer: (prefs: ConversationPrefs) => void
 
   toggleSidebar: () => void
+  setSidebarOpen: (open: boolean) => void
   setCommandPaletteOpen: (open: boolean) => void
   setSettingsOpen: (open: boolean) => void
 
@@ -178,7 +180,8 @@ export const useStore = create<State>((set, get) => ({
   // Overwritten at boot from the settings, and on every open from the
   // conversation's own last send; this is only the value before either runs.
   composerSearch: 'native',
-  sidebarOpen: true,
+  // A phone opens on the chat, with the list behind the drawer.
+  sidebarOpen: !matchesNow(COMPACT_QUERY),
   commandPaletteOpen: false,
   settingsOpen: false,
 
@@ -284,6 +287,7 @@ export const useStore = create<State>((set, get) => ({
       excludedLaneIds: prefs.excludedLaneIds ?? [],
     }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
 

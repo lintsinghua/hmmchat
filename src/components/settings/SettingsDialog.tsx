@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   Check,
@@ -28,13 +28,14 @@ import { SEARCH_ADAPTERS } from '@/search/adapters'
 import * as db from '@/lib/db'
 import { originOf, secretNameForProvider, setSecret, deleteSecret, listSecretNames } from '@/lib/secrets'
 import { useTheme, type ThemePreference } from '@/hooks/useTheme'
+import { useTouch } from '@/hooks/useMedia'
 import { MAX_LANES, refreshSummaries } from '@/chat/session'
 import type { ModelRef, ReasoningLevel, SearchMode } from '@/chat/types'
 import { REASONING_LABELS } from '@/providers/reasoning'
 import { useAvailableModels } from '@/components/model/ModelPicker'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
-import { Dialog, DialogContent, DialogHiddenTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogHiddenTitle, DIALOG_CLOSE_GUTTER } from '@/components/ui/Dialog'
 import type { ProviderKind } from '@/providers/reasoning'
 import {
   SHORTCUTS,
@@ -54,6 +55,10 @@ import { settings as copy } from '@/i18n'
  * anywhere in the app — provider configuration is a rare, deliberate action and
  * belongs behind one door, which is the main structural difference from the
  * aggregator apps this replaces.
+ *
+ * On a phone the dialog is the whole screen and the section list turns into a
+ * row of tabs along its top, so every section keeps the full width. A touch
+ * screen has no keyboard to bind, so 快捷键 is not offered there at all.
  */
 
 type Section = 'providers' | 'defaults' | 'search' | 'general' | 'shortcuts'
@@ -68,33 +73,51 @@ const SECTIONS: Array<{ id: Section; label: Entry }> = [
 
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT()
-  const [section, setSection] = useState<Section>('providers')
+  const touch = useTouch()
+  const [chosen, setSection] = useState<Section>('providers')
+  const sections = touch ? SECTIONS.filter((entry) => entry.id !== 'shortcuts') : SECTIONS
+  // Left on 快捷键 and then reopened on a touch screen, it falls back to the first.
+  const section = sections.some((entry) => entry.id === chosen) ? chosen : sections[0].id
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent width={720} height={560} className="flex">
         <DialogHiddenTitle>{t(copy.dialogTitle)}</DialogHiddenTitle>
 
-        <nav className="flex w-[164px] shrink-0 flex-col border-r border-line bg-surface/50 p-2">
-          {SECTIONS.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              onClick={() => setSection(entry.id)}
-              className={cn(
-                'rounded-[8px] px-2.5 py-[7px] text-left text-[13px] font-medium',
-                'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
-                section === entry.id
-                  ? 'bg-surface-active text-ink'
-                  : 'text-ink-soft hover:bg-surface-hover hover:text-ink',
-              )}
-            >
-              {t(entry.label)}
-            </button>
-          ))}
-        </nav>
+        {/*
+          On a phone the strip scrolls, and a scroller's own padding only shows
+          at the end of its content — so the room for the close button is kept
+          by this wrapper instead, which is no box at all on a desktop.
+        */}
+        <div className={cn('contents max-md:block max-md:shrink-0 max-md:border-b max-md:border-line', DIALOG_CLOSE_GUTTER)}>
+          <nav
+            className={cn(
+              'flex w-[164px] shrink-0 flex-col border-r border-line bg-surface/50 p-2',
+              'max-md:no-scrollbar max-md:w-full max-md:flex-row max-md:gap-1 max-md:overflow-x-auto',
+              'max-md:border-r-0 max-md:bg-transparent max-md:py-2',
+            )}
+          >
+            {sections.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => setSection(entry.id)}
+                className={cn(
+                  'rounded-[8px] px-2.5 py-[7px] text-left text-[13px] font-medium',
+                  'max-md:shrink-0 max-md:whitespace-nowrap max-md:px-3 max-md:py-2 max-md:text-[14px]',
+                  'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
+                  section === entry.id
+                    ? 'bg-surface-active text-ink'
+                    : 'text-ink-soft hover:bg-surface-hover hover:text-ink',
+                )}
+              >
+                {t(entry.label)}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-        <div className="min-w-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {section === 'providers' ? <ProvidersSection /> : null}
           {section === 'search' ? <SearchSection /> : null}
           {section === 'defaults' ? <DefaultsSection /> : null}
@@ -355,7 +378,8 @@ function ProviderForm({
           <button
             type="button"
             onClick={onCancel}
-            className="text-ink-faint hover:text-ink"
+            // A 14px glyph; a finger needs the box around it.
+            className="text-ink-faint hover:text-ink touch:-m-3 touch:p-3"
             aria-label={t(copy.cancel)}
           >
             <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -439,7 +463,7 @@ function ProviderForm({
         <button
           type="button"
           onClick={onCancel}
-          className="text-ink-faint hover:text-ink"
+          className="text-ink-faint hover:text-ink touch:-m-3 touch:p-3"
           aria-label={t(copy.cancel)}
         >
           <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -552,6 +576,12 @@ function ProviderDetail({
 }) {
   const t = useT()
   const [models, setModels] = useState(provider.models ?? [])
+  // The list as last changed here, ahead of the store: two taps in a row each
+  // build on the one before, not on what the last render happened to hold.
+  const latest = useRef(models)
+  // Writes go one after another, and while any is outstanding the store's copy
+  // is older than this one and is not let back in over it.
+  const writes = useRef<{ chain: Promise<void>; pending: number }>({ chain: Promise.resolve(), pending: 0 })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [manual, setManual] = useState('')
@@ -560,7 +590,9 @@ function ProviderDetail({
   const [probing, setProbing] = useState(false)
 
   useEffect(() => {
-    setModels(provider.models ?? [])
+    if (writes.current.pending) return
+    latest.current = provider.models ?? []
+    setModels(latest.current)
   }, [provider.models])
 
   const probeOne = async (modelId: string) => {
@@ -588,18 +620,32 @@ function ProviderDetail({
   )
   const failed = results.filter((entry) => !entry.ok).length
 
-  const persist = async (next: Array<{ id: string; enabled: boolean }>) => {
+  const persist = (next: Array<{ id: string; enabled: boolean }>) => {
+    latest.current = next
     setModels(next)
-    await db.upsertProvider({
-      id: provider.id,
-      kind: provider.kind,
-      name: provider.name,
-      baseUrl: provider.baseUrl,
-      enabled: provider.enabled,
-      models: next,
-    })
-    await onChanged()
+    const queue = writes.current
+    queue.pending += 1
+    queue.chain = queue.chain
+      .then(async () => {
+        await db.upsertProvider({
+          id: provider.id,
+          kind: provider.kind,
+          name: provider.name,
+          baseUrl: provider.baseUrl,
+          enabled: provider.enabled,
+          models: next,
+        })
+        await onChanged()
+      })
+      .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)))
+      .finally(() => {
+        queue.pending -= 1
+      })
+    return queue.chain
   }
+
+  const toggle = (id: string, enabled: boolean) =>
+    void persist(latest.current.map((entry) => (entry.id === id ? { ...entry, enabled } : entry)))
 
   const refetch = async () => {
     setBusy(true)
@@ -611,7 +657,7 @@ function ProviderDetail({
         discovered.map((model) => ({
           id: model.id,
           // Keep the user's existing choices; only pre-select what is new.
-          enabled: models.find((entry) => entry.id === model.id)?.enabled ?? preferred.has(model.id),
+          enabled: latest.current.find((entry) => entry.id === model.id)?.enabled ?? preferred.has(model.id),
         })),
       )
     } catch (caught) {
@@ -654,7 +700,14 @@ function ProviderDetail({
 
       {error ? <p className="mb-2 text-[12px] text-danger">{error}</p> : null}
 
-      <div className="max-h-[220px] overflow-y-auto rounded-[9px] border border-line bg-paper">
+      {/*
+        Scrolls inside its own box on a desktop, where a long catalogue would
+        otherwise push the dialog's controls away. On a phone the dialog is the
+        screen and already scrolls: a second scroller inside it catches swipes
+        meant for the page, and a tap made while it is still gliding lands on
+        whichever row has moved under the finger.
+      */}
+      <div className="max-h-[220px] overflow-y-auto rounded-[9px] border border-line bg-paper max-md:max-h-none max-md:overflow-visible">
         {models.length === 0 ? (
           <p className="px-3 py-3 text-[12.5px] text-ink-faint">
             {t(copy.modelsEmpty)}
@@ -663,32 +716,51 @@ function ProviderDetail({
           models.map((model) => (
             <div
               key={model.id}
-              className="flex items-center gap-2.5 border-b border-line px-3 py-1.5 last:border-b-0 hover:bg-surface-hover"
+              className="flex flex-col border-b border-line last:border-b-0 hover:bg-surface-hover"
             >
-              {/* Only the identifying half toggles the model; the test button is
-                  its own control and must not enable or disable anything. */}
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
-                <input
-                  type="checkbox"
-                  checked={model.enabled}
-                  onChange={(event) =>
-                    void persist(
-                      models.map((entry) =>
-                        entry.id === model.id ? { ...entry, enabled: event.target.checked } : entry,
-                      ),
-                    )
-                  }
-                  className="h-3.5 w-3.5 shrink-0 accent-[hsl(var(--ink))]"
-                />
-                <ModelIcon modelId={model.id} className="h-3.5 w-3.5 text-ink-muted" />
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-soft">
-                  {displayName(model.id)}
+              <div className="flex items-stretch gap-2.5 pr-3">
+                {/*
+                  Only the identifying half toggles the model; the test button is
+                  its own control and must not enable or disable anything. The
+                  label is the row's full height, padding included: with the
+                  padding outside it, a finger landing between two labels was
+                  resolved by WebKit to whichever label it judged nearest, which
+                  was often the next row's.
+                */}
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-1.5 pl-3 touch:min-h-11">
+                  <input
+                    type="checkbox"
+                    checked={model.enabled}
+                    onChange={(event) => toggle(model.id, event.target.checked)}
+                    className="h-3.5 w-3.5 shrink-0 accent-[hsl(var(--ink))] touch:h-[18px] touch:w-[18px]"
+                  />
+                  <ModelIcon modelId={model.id} className="h-3.5 w-3.5 text-ink-muted" />
+                  {/* On a phone the id goes under the name, so neither is cut to a few letters. */}
+                  <span className="flex min-w-0 flex-1 items-center gap-2.5 max-md:flex-col max-md:items-start max-md:gap-0">
+                    <span className="min-w-0 max-w-full flex-1 truncate text-[12.5px] text-ink-soft touch:text-[14px] max-md:flex-none">
+                      {displayName(model.id)}
+                    </span>
+                    <span className="max-w-[140px] shrink-0 truncate font-mono text-[11px] text-ink-faint max-md:max-w-full">
+                      {model.id}
+                    </span>
+                  </span>
+                </label>
+                <span className="flex items-center">
+                  <HealthBadge state={health[model.id]} onProbe={() => void probeOne(model.id)} />
                 </span>
-                <span className="max-w-[140px] shrink-0 truncate font-mono text-[11px] text-ink-faint">
-                  {model.id}
-                </span>
-              </label>
-              <HealthBadge state={health[model.id]} onProbe={() => void probeOne(model.id)} />
+              </div>
+              {/*
+                Why a model failed its test. On a desktop that is the badge's
+                tooltip; a finger has no hover, so it is written out here.
+              */}
+              {(() => {
+                const state = health[model.id]
+                return state && state !== 'running' && !state.ok && state.error ? (
+                  <p className="-mt-1 line-clamp-2 hidden px-3 pb-2 pl-9 text-[12px] leading-snug text-danger touch:block">
+                    {state.error}
+                  </p>
+                ) : null
+              })()}
             </div>
           ))
         )}
@@ -702,8 +774,8 @@ function ProviderDetail({
             if (event.nativeEvent.isComposing || event.keyCode === 229) return
             if (event.key !== 'Enter') return
             const id = manual.trim()
-            if (!id || models.some((entry) => entry.id === id)) return
-            void persist([...models, { id, enabled: true }])
+            if (!id || latest.current.some((entry) => entry.id === id)) return
+            void persist([...latest.current, { id, enabled: true }])
             setManual('')
           }}
           placeholder={t(copy.manualModelPlaceholder)}
@@ -990,7 +1062,7 @@ function DefaultsSection() {
                 <label
                   key={modelKey(model)}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-[7px] px-2 py-1.5 text-[13px]',
+                    'flex items-center gap-2.5 rounded-[7px] px-2 py-1.5 text-[13px] touch:min-h-11 touch:text-[14px]',
                     isPrimary || full ? 'cursor-default text-ink-faint' : 'cursor-pointer text-ink-soft hover:bg-surface-hover',
                   )}
                 >
@@ -999,7 +1071,7 @@ function DefaultsSection() {
                     checked={checked}
                     disabled={isPrimary || full}
                     onChange={() => toggleCompare({ providerId: model.providerId, modelId: model.modelId })}
-                    className="h-3.5 w-3.5 accent-[hsl(var(--ink))]"
+                    className="h-3.5 w-3.5 accent-[hsl(var(--ink))] touch:h-[18px] touch:w-[18px]"
                   />
                   <ModelIcon modelId={model.modelId} className="h-3.5 w-3.5" />
                   <span className="min-w-0 flex-1 truncate">{displayName(model.modelId)}</span>
@@ -1125,12 +1197,12 @@ function GeneralSection() {
           />
         </Field>
 
-        <label className="flex cursor-pointer items-center gap-2.5">
+        <label className="flex cursor-pointer items-center gap-2.5 touch:min-h-11">
           <input
             type="checkbox"
             checked={settings.autoTitle}
             onChange={(event) => setSettings({ autoTitle: event.target.checked })}
-            className="h-3.5 w-3.5 accent-[hsl(var(--ink))]"
+            className="h-3.5 w-3.5 accent-[hsl(var(--ink))] touch:h-[18px] touch:w-[18px]"
           />
           <span className="text-[13px] text-ink-soft">{t(copy.autoTitle)}</span>
         </label>

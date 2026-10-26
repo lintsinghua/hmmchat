@@ -22,7 +22,7 @@ import {
   type ShortcutMap,
 } from '@/lib/shortcuts'
 import { cn } from '@/lib/cn'
-import { Dialog, DialogContent, DialogHiddenTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogHiddenTitle, DIALOG_CLOSE_GUTTER } from '@/components/ui/Dialog'
 import { getLanguage, useT } from '@/i18n/core'
 import { app } from '@/i18n'
 
@@ -96,10 +96,10 @@ export function CommandPalette({
 
         <Command
           loop
-          className="flex flex-col"
+          className="flex flex-col max-md:min-h-0 max-md:flex-1"
           filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
         >
-          <div className="flex items-center gap-2 border-b border-line px-3.5 py-3">
+          <div className={cn('flex items-center gap-2 border-b border-line px-3.5 py-3', DIALOG_CLOSE_GUTTER)}>
             <Search className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2} />
             <Command.Input
               autoFocus
@@ -108,7 +108,7 @@ export function CommandPalette({
             />
           </div>
 
-          <Command.List className="max-h-[380px] overflow-y-auto p-1.5">
+          <Command.List className="max-h-[380px] overflow-y-auto p-1.5 max-md:max-h-none max-md:flex-1">
             <Command.Empty className="px-3 py-6 text-center text-[13px] text-ink-muted">
               {t(app.paletteEmpty)}
             </Command.Empty>

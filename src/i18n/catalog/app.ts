@@ -4,6 +4,8 @@ import type { Entry } from '../core'
 export const app = {
   // Title bar
   showSidebar: { en: 'Show sidebar', zh: '显示侧栏' },
+  showChats: { en: 'Chats', zh: '对话列表' },
+  close: { en: 'Close', zh: '关闭' },
 
   // Empty state greetings: reasons to open the app, not product copy.
   greetingAskAnything: { en: 'What would you like to ask today?', zh: '今天想问点什么？' },
@@ -17,6 +19,9 @@ export const app = {
 
   // Hint chips
   hintDropFiles: { en: 'Drop in files for the model to read', zh: '拖入文件即可让模型阅读' },
+  hintAttachTouch: { en: 'Tap + to add files for the model to read', zh: '点 + 添加文件让模型阅读' },
+  hintCompareTouch: { en: 'Tap the columns button to compare models', zh: '点「对比」并排多个模型' },
+  hintSwipe: { en: 'Swipe from the left edge for your chats', zh: '从左边缘右滑查看对话' },
   hintCompare: { en: 'Use Compare on the right to run models side by side', zh: '右侧「对比」并排多个模型' },
   hintPalette: { en: 'Open the command palette', zh: '打开命令面板' },
 
@@ -42,6 +47,7 @@ export const app = {
   duplicateChat: { en: 'Duplicate chat', zh: '复制对话' },
   rename: { en: 'Rename', zh: '重命名' },
   deleteChat: { en: 'Delete chat', zh: '删除对话' },
+  chatActions: { en: 'Chat actions', zh: '对话操作' },
   groupPinned: { en: 'Pinned', zh: '置顶' },
   groupToday: { en: 'Today', zh: '今天' },
   groupYesterday: { en: 'Yesterday', zh: '昨天' },

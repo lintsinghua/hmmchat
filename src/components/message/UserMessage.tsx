@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { FileText, GitBranch, Image as ImageIcon, MessageSquareQuote, Pencil } from 'lucide-react'
+import { FileText, Image as ImageIcon, MessageSquareQuote, Pencil } from 'lucide-react'
 import { openConversation } from '@/chat/session'
 import type { Turn } from '@/chat/types'
 import { cn } from '@/lib/cn'
+import { enterSends } from '@/hooks/useMedia'
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useT } from '@/i18n/core'
@@ -18,13 +19,10 @@ import { thread } from '@/i18n'
 export function UserMessage({
   turn,
   onEdit,
-  onFork,
   siblingInfo,
 }: {
   turn: Turn
   onEdit: (text: string) => void
-  /** Starts a new conversation carrying the context up to this question. */
-  onFork: () => void
   /** Present when this question has alternative branches. */
   siblingInfo?: { index: number; total: number; onSelect: (turnId: string) => void; ids: string[] }
 }) {
@@ -56,7 +54,7 @@ export function UserMessage({
               // Same IME guard as the composer: a candidate-selecting Enter must
               // not submit.
               if (event.nativeEvent.isComposing || event.keyCode === 229) return
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === 'Enter' && !event.shiftKey && enterSends()) {
                 event.preventDefault()
                 submit()
               }
@@ -160,6 +158,7 @@ export function UserMessage({
           'flex items-center gap-0.5',
           'opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out)]',
           'group-hover/user:opacity-100 focus-within:opacity-100',
+          'touch:opacity-70',
         )}
       >
         {siblingInfo && siblingInfo.total > 1 ? (
@@ -185,12 +184,6 @@ export function UserMessage({
             </Button>
           </div>
         ) : null}
-
-        <Tooltip label={t(thread.forkHere)} shortcut={t(thread.forkHereHint)}>
-          <Button size="icon-sm" onClick={onFork} aria-label={t(thread.forkHere)}>
-            <GitBranch className="h-[14px] w-[14px]" strokeWidth={1.75} />
-          </Button>
-        </Tooltip>
 
         <Tooltip label={t(thread.editAndResend)}>
           <Button size="icon-sm" onClick={() => setEditing(true)} aria-label={t(thread.editMessage)}>

@@ -196,8 +196,9 @@ await shoot('reasoning-collapsed')
 
 // --- Fork -------------------------------------------------------------------
 console.log('fork')
-const firstQuestion = page.locator('[data-turn]').first()
-await firstQuestion.hover()
+// The branch control sits under an answer, with copy and regenerate.
+const firstAnswer = page.locator('[data-turn]').first().locator('.group\\/reply').first()
+await firstAnswer.hover()
 await settle(200)
 await page.getByLabel('从这里分支').first().click()
 await settle(1200)

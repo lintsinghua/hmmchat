@@ -31,6 +31,7 @@ import {
   switchLaneModel,
 } from '@/chat/session'
 import { useLaneReorder } from '@/hooks/useLaneReorder'
+import { enterSends, useCompact, useTouch } from '@/hooks/useMedia'
 import {
   laneAnswerCount,
   visibleLanes,
@@ -73,6 +74,11 @@ import { ReferencePicker } from './ReferencePicker'
  * live here rather than in a toolbar or a right-hand panel. Each is a quiet text
  * control that only shows a background on hover, so the resting state reads as a
  * sentence and a button rather than as an instrument panel.
+ *
+ * On a phone it is the same card, closer to the edges and sitting just above
+ * the keyboard or the home indicator. The labels that do not fit drop to their
+ * icons, actions that a mouse would hover to find are always shown, and Enter
+ * makes a new line — sending is the button, as in every phone messenger.
  */
 
 /** Grows to this height, then scrolls. */
@@ -87,6 +93,8 @@ export function Composer({
   stopShortcut?: string
 }) {
   const t = useT()
+  const touch = useTouch()
+  const compact = useCompact()
   const graph = useStore((state) => state.graph)
   const providers = useStore((state) => state.providers)
   const composerModel = useStore((state) => state.composerModel)
@@ -269,6 +277,26 @@ export function Composer({
     [chips, providers, laneReasoning, composerReasoning],
   )
 
+  /*
+   * On a phone, several models do not fit as a row of chips beside the
+   * controls: each name is cut to a few letters, a chip's arrow and × run
+   * together, and a third chip slides out of sight. So they fold into one
+   * button that shows who answers, and everything about the columns — who is
+   * asked this round, which model each is, removing and adding — is in the
+   * panel it opens.
+   */
+  const grouped = compact && chips.length > 1
+  const compareProps = {
+    lanes: lanes.length,
+    taken: lanes.length ? lanes.map((lane) => lane.model) : chips.map((chip) => chip.model),
+    removed,
+    onAdd: (model: { providerId: string; modelId: string }) => void addLane(model),
+    onRestore: (laneId: string) => {
+      void restoreLane(laneId)
+      if (justRemoved?.id === laneId) setJustRemoved(null)
+    },
+  }
+
   // Auto-grow: reset to auto first so the textarea can shrink again when text
   // is deleted, then clamp to the maximum.
   const resize = useCallback(() => {
@@ -343,7 +371,7 @@ export function Composer({
       return
     }
 
-    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && enterSends()) {
       event.preventDefault()
       submit()
       return
@@ -363,7 +391,16 @@ export function Composer({
   }
 
   return (
-    <div className="pointer-events-none sticky bottom-0 z-10 px-6 pb-5">
+    <div
+      className={cn(
+        'pointer-events-none sticky bottom-0 z-10 px-6 pb-5',
+        'touch:pb-[max(20px,env(safe-area-inset-bottom))]',
+        'max-md:px-3 max-md:pb-[max(10px,env(safe-area-inset-bottom))]',
+        // The keyboard covers the home indicator, so its margin would only be a
+        // gap between the composer and the keys.
+        'keyboard:pb-2 max-md:keyboard:pb-2',
+      )}
+    >
       <div className="pointer-events-auto relative mx-auto w-full max-w-[880px]">
         {/*
           Removal is undoable in place: a small notice over the composer says
@@ -477,18 +514,21 @@ export function Composer({
                   : t(composer.placeholderSome, { count: targets.length })
                 : chips.length > 1
                   ? t(composer.placeholderTogether, { count: chips.length })
-                  : t(composer.placeholder)
+                  : // A phone has nothing to drag files from.
+                    t(touch ? composer.placeholderTouch : composer.placeholder)
             }
             className={cn(
               'block w-full bg-transparent px-4 pb-1 pt-3.5',
               'text-[15px] leading-[1.6] text-ink placeholder:text-ink-faint',
               'max-h-[200px] overflow-y-auto',
+              // Half the screen is keyboard on a phone; the thread keeps the rest.
+              'touch:text-[16px] max-md:max-h-[128px] max-md:pt-3',
             )}
           />
 
           <div className="flex items-center gap-1 px-2 pb-2 pt-1">
             {/* --- Files + model chips, one per visible lane ----------------- */}
-            <div ref={chipsRef} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            <div ref={chipsRef} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto touch:no-scrollbar">
               <Popover open={addOpen} onOpenChange={setAddOpen}>
                 <PopoverTrigger asChild>
                   <button
@@ -498,7 +538,7 @@ export function Composer({
                     title={t(composer.addTitle)}
                     className={cn(
                       'flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px]',
-                      'text-ink-muted',
+                      'text-ink-muted touch:h-8 touch:w-8',
                       'transition-colors duration-[var(--dur-instant)] ease-[var(--ease-out)]',
                       'hover:bg-surface-hover hover:text-ink',
                       'disabled:pointer-events-none disabled:opacity-40',
@@ -541,7 +581,27 @@ export function Composer({
                 lane is created by the first send — but it keeps the composer
                 honest about which model is about to answer.
               */}
-              {chips.map((chip, index) => {
+              {grouped ? (
+                <LanesPanel
+                  chips={chips}
+                  targets={targets}
+                  narrowed={narrowed}
+                  onToggle={toggleLaneExcluded}
+                  onIncludeAll={includeAllLanes}
+                  onRemove={(laneId) => {
+                    const lane = lanes.find((entry) => entry.id === laneId)
+                    void removeLane(laneId)
+                    if (lane) setJustRemoved(lane)
+                  }}
+                  onSwitch={(laneId, model) => {
+                    setComposerModel(model)
+                    if (laneId) void switchLaneModel(laneId, model)
+                  }}
+                  compare={compareProps}
+                />
+              ) : null}
+
+              {!grouped && chips.map((chip, index) => {
                 // Only real columns can be left out; the draft chip is the one
                 // model a new conversation starts with.
                 const selectable = chips.length > 1 && chip.laneId
@@ -670,6 +730,7 @@ export function Composer({
                           'flex h-5 w-5 items-center justify-center rounded-[5px]',
                           'text-ink-faint opacity-0 transition-opacity duration-[var(--dur-instant)]',
                           'hover:text-ink group-hover/chip:opacity-100',
+                          'touch:h-6 touch:w-6 touch:opacity-100',
                         )}
                       >
                         <X className="h-3 w-3" strokeWidth={2} />
@@ -699,7 +760,7 @@ export function Composer({
                 </button>
               ) : null}
 
-              {narrowed ? (
+              {narrowed && !grouped ? (
                 <button
                   type="button"
                   onClick={includeAllLanes}
@@ -724,31 +785,10 @@ export function Composer({
 
             {/* The controls hold their size; only the chip row flexes. */}
             <div className="flex shrink-0 items-center gap-1">
-            {/* --- Compare -------------------------------------------------- */}
-            <CompareControl
-              lanes={lanes.length}
-              taken={lanes.length ? lanes.map((lane) => lane.model) : chips.map((chip) => chip.model)}
-              removed={removed}
-              onAdd={(model) => void addLane(model)}
-              onRestore={(laneId) => {
-                void restoreLane(laneId)
-                if (justRemoved?.id === laneId) setJustRemoved(null)
-              }}
-            />
+            {/* --- Compare (inside the models panel when grouped) ------------- */}
+            {grouped ? null : <CompareControl {...compareProps} />}
 
-            {reasoningNote && chips.length <= 1 ? (
-              <Tooltip label={reasoningNote}>
-                <span
-                  className={cn(
-                    'flex h-7 shrink-0 items-center gap-1 rounded-[7px] px-2',
-                    'text-[12.5px] font-medium text-ink-faint',
-                  )}
-                >
-                  <Brain className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  <span>{t(composer.reasoningDefault)}</span>
-                </span>
-              </Tooltip>
-            ) : null}
+            {reasoningNote && chips.length <= 1 ? <ReasoningNote note={reasoningNote} /> : null}
 
             {/* --- Search toggle -------------------------------------------- */}
             <SearchToggle
@@ -786,7 +826,7 @@ export function Composer({
                   variant="subtle"
                   onClick={stopTurn}
                   aria-label={t(composer.stopGenerating)}
-                  className="h-8 w-8 rounded-[var(--radius-full)]"
+                  className="h-8 w-8 rounded-[var(--radius-full)] touch:h-9 touch:w-9"
                 >
                   <Square className="h-[13px] w-[13px] fill-current" strokeWidth={2} />
                 </Button>
@@ -798,7 +838,7 @@ export function Composer({
                 onClick={submit}
                 disabled={!value.trim()}
                 aria-label={t(composer.send)}
-                className="h-8 w-8 rounded-[var(--radius-full)]"
+                className="h-8 w-8 rounded-[var(--radius-full)] touch:h-9 touch:w-9"
               >
                 <ArrowUp className="h-[17px] w-[17px]" strokeWidth={2.25} />
               </Button>
@@ -853,7 +893,8 @@ export function Composer({
           />
         ) : null}
 
-        <p className="mt-2 text-center text-[11.5px] text-ink-faint">
+        {/* Keyboard advice, for a keyboard. */}
+        <p className="mt-2 text-center text-[11.5px] text-ink-faint touch:hidden">
           {t(composer.footerHint)}
         </p>
       </div>
@@ -940,6 +981,7 @@ function AttachmentChip({ file, onRemove }: { file: Attachment; onRemove: () => 
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] text-ink-faint',
           'opacity-0 transition-opacity duration-[var(--dur-instant)]',
           'hover:text-ink group-hover/att:opacity-100 focus-visible:opacity-100',
+          'touch:h-6 touch:w-6 touch:opacity-100',
         )}
       >
         <X className="h-3 w-3" strokeWidth={2} />
@@ -961,26 +1003,18 @@ function AttachmentChip({ file, onRemove }: { file: Attachment; onRemove: () => 
  * much they had answered: bringing one back restores its answers rather than
  * starting the model over, so it is a different act from adding.
  */
-function CompareControl({
-  lanes,
-  taken,
-  removed,
-  onAdd,
-  onRestore,
-}: {
+type CompareProps = {
   lanes: number
   /** Models already answering in a column; each may appear only once. */
   taken: { providerId: string; modelId: string }[]
   removed: { lane: Lane; answers: number; duplicate: boolean }[]
   onAdd: (model: { providerId: string; modelId: string }) => void
   onRestore: (laneId: string) => void
-}) {
-  const t = useT()
-  const models = useAvailableModels()
-  const [open, setOpen] = useState(false)
-  const comparing = lanes > 1
-  const full = lanes >= MAX_LANES
+}
 
+/** What can be added beside the current columns, and what can come back. */
+function useCompareOptions({ taken, removed }: Pick<CompareProps, 'taken' | 'removed'>) {
+  const models = useAvailableModels()
   const same = (a: { providerId: string; modelId: string }, b: { providerId: string; modelId: string }) =>
     a.providerId === b.providerId && a.modelId === b.modelId
   // A model with a removed column is offered only as that column, under 已移除.
@@ -988,13 +1022,82 @@ function CompareControl({
     (model) => !taken.some((lane) => same(lane, model)) && !removed.some((entry) => same(entry.lane.model, model)),
   )
   const restorable = removed.filter((entry) => !entry.duplicate)
+  return { options, restorable }
+}
+
+/** The 已移除 and add-a-model lists, shared by the Compare menu and the phone's models panel. */
+function CompareList({
+  lanes,
+  onAdd,
+  onRestore,
+  onFull,
+  options,
+  restorable,
+}: CompareProps & ReturnType<typeof useCompareOptions> & { onFull: () => void }) {
+  const t = useT()
+  const comparing = lanes > 1
+  return (
+    <>
+      {restorable.length ? (
+        <>
+          <PopoverLabel>{t(composer.removed)}</PopoverLabel>
+          {restorable.map(({ lane, answers }) => (
+            <PopoverItem
+              key={lane.id}
+              closeOnSelect={false}
+              onSelect={() => {
+                onRestore(lane.id)
+                if (lanes + 1 >= MAX_LANES) onFull()
+              }}
+            >
+              <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5 text-ink-muted" />
+              <span className="min-w-0 flex-1 truncate">{displayName(lane.model.modelId)}</span>
+              <span className="shrink-0 text-[11px] text-ink-faint">
+                {t(composer.answeredRounds, { count: answers })}
+              </span>
+              <RotateCcw className="h-3 w-3 shrink-0 text-ink-faint" strokeWidth={2} aria-label={t(composer.restore)} />
+            </PopoverItem>
+          ))}
+          {options.length ? <PopoverSeparator /> : null}
+        </>
+      ) : null}
+      {options.length ? (
+        <PopoverLabel>{comparing ? t(composer.addAnotherModel) : t(composer.compareSideBySide)}</PopoverLabel>
+      ) : null}
+      {options.map((model) => (
+        <PopoverItem
+          key={`${model.providerId}:${model.modelId}`}
+          closeOnSelect={false}
+          onSelect={() => {
+            onAdd({ providerId: model.providerId, modelId: model.modelId })
+            // Stays open: adding a model is not a completed interaction, and
+            // closing it made comparing three models a three-popover job.
+            if (lanes + 1 >= MAX_LANES) onFull()
+          }}
+        >
+          <ModelIcon modelId={model.modelId} className="h-3.5 w-3.5 text-ink-muted" />
+          <span className="min-w-0 flex-1 truncate">{displayName(model.modelId)}</span>
+          <span className="shrink-0 text-[11px] text-ink-faint">{model.providerName}</span>
+        </PopoverItem>
+      ))}
+    </>
+  )
+}
+
+function CompareControl(props: CompareProps) {
+  const t = useT()
+  const { lanes } = props
+  const lists = useCompareOptions(props)
+  const [open, setOpen] = useState(false)
+  const comparing = lanes > 1
+  const full = lanes >= MAX_LANES
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          disabled={full || (!options.length && !restorable.length)}
+          disabled={full || (!lists.options.length && !lists.restorable.length)}
           title={
             full
               ? t(composer.maxLanes, { max: MAX_LANES })
@@ -1013,54 +1116,175 @@ function CompareControl({
           )}
         >
           <Columns2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-          {comparing ? <span>{t(composer.columns, { count: lanes })}</span> : <span>{t(composer.compare)}</span>}
+          {/* At phone width the icon alone says Compare; the count still shows. */}
+          {comparing ? (
+            <span className="whitespace-nowrap">{t(composer.columns, { count: lanes })}</span>
+          ) : (
+            <span className="max-md:sr-only">{t(composer.compare)}</span>
+          )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" side="top" width={300} className="max-h-[380px] overflow-y-auto">
-        {restorable.length ? (
-          <>
-            <PopoverLabel>{t(composer.removed)}</PopoverLabel>
-            {restorable.map(({ lane, answers }) => (
-              <PopoverItem
-                key={lane.id}
-                onSelect={() => {
-                  onRestore(lane.id)
-                  if (lanes + 1 >= MAX_LANES) setOpen(false)
-                }}
+      <PopoverContent align="end" side="top" width={300} maxHeight={380}>
+        <CompareList {...props} {...lists} onFull={() => setOpen(false)} />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
+ * The compared models on a phone, as one button and the panel behind it.
+ *
+ * The face is the models' icons, overlapped, and how many answer — `3 个模型`,
+ * or `2/3 个模型` when some sit this round out — so who is answering is plain
+ * without opening it. The panel has a row per column: whether it is asked this
+ * round, which model it is, and removing it; then adding another.
+ */
+function LanesPanel({
+  chips,
+  targets,
+  narrowed,
+  onToggle,
+  onIncludeAll,
+  onRemove,
+  onSwitch,
+  compare,
+}: {
+  chips: Array<{ id: string; laneId: string | null; model: { providerId: string; modelId: string } }>
+  targets: Lane[]
+  narrowed: boolean
+  onToggle: (laneId: string) => void
+  onIncludeAll: () => void
+  onRemove: (laneId: string) => void
+  onSwitch: (laneId: string | null, model: { providerId: string; modelId: string }) => void
+  compare: CompareProps
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const lists = useCompareOptions(compare)
+  const asked = (chip: (typeof chips)[number]) => !chip.laneId || targets.some((lane) => lane.id === chip.laneId)
+  const full = compare.lanes >= MAX_LANES
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={t(composer.answeringModels)}
+          className={cn(
+            'flex h-8 min-w-0 shrink items-center gap-1.5 rounded-[8px] px-1.5',
+            'text-[13px] font-medium text-ink-soft active:bg-surface-active',
+          )}
+        >
+          <span className="flex shrink-0 items-center -space-x-1.5">
+            {chips.slice(0, MAX_LANES).map((chip) => (
+              <span
+                key={chip.id}
+                className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-paper ring-1 ring-line"
               >
-                <ModelIcon modelId={lane.model.modelId} className="h-3.5 w-3.5 text-ink-muted" />
-                <span className="min-w-0 flex-1 truncate">{displayName(lane.model.modelId)}</span>
-                <span className="shrink-0 text-[11px] text-ink-faint">
-                  {t(composer.answeredRounds, { count: answers })}
-                </span>
-                <RotateCcw
-                  className="h-3 w-3 shrink-0 text-ink-faint"
-                  strokeWidth={2}
-                  aria-label={t(composer.restore)}
+                <ModelIcon
+                  modelId={chip.model.modelId}
+                  className={cn('h-3 w-3', !asked(chip) && 'opacity-40 grayscale')}
                 />
-              </PopoverItem>
+              </span>
             ))}
-            {options.length ? <PopoverSeparator /> : null}
+          </span>
+          <span className="whitespace-nowrap">
+            {narrowed
+              ? t(composer.modelsAsked, { n: targets.length, total: chips.length })
+              : t(composer.modelsCount, { count: chips.length })}
+          </span>
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-50" strokeWidth={2} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" width={320} maxHeight={460}>
+        <div className="flex items-center justify-between pr-1">
+          <PopoverLabel>{t(composer.answeringModels)}</PopoverLabel>
+          {narrowed ? (
+            <button
+              type="button"
+              onClick={onIncludeAll}
+              className="rounded-[6px] px-2 py-1 text-[13px] font-medium text-ink-soft active:bg-surface-active"
+            >
+              {t(composer.askAll)}
+            </button>
+          ) : null}
+        </div>
+        {chips.map((chip, index) => {
+          const included = asked(chip)
+          const lastIncluded = included && targets.length === 1
+          const name = displayName(chip.model.modelId)
+          return (
+            <div key={chip.id} className="flex items-center rounded-[8px]">
+              {chip.laneId ? (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={included}
+                  aria-label={t(composer.sendTo, { model: name })}
+                  disabled={lastIncluded}
+                  onClick={() => onToggle(chip.laneId!)}
+                  className="flex h-11 w-10 shrink-0 items-center justify-center disabled:opacity-60"
+                >
+                  <span
+                    className={cn(
+                      'flex h-[18px] w-[18px] items-center justify-center rounded-full',
+                      included ? 'bg-ink text-paper' : 'border border-line-strong',
+                    )}
+                  >
+                    {included ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                  </span>
+                </button>
+              ) : (
+                <span className="w-10 shrink-0" />
+              )}
+              {chip.laneId || index === 0 ? (
+                <ModelPicker
+                  value={chip.model}
+                  align="start"
+                  side="top"
+                  onSelect={(model) => onSwitch(chip.laneId, model)}
+                  trigger={
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[8px] px-1.5 text-left text-[14px]',
+                        included ? 'text-ink' : 'text-ink-faint',
+                        'active:bg-surface-active',
+                      )}
+                    >
+                      <ModelIcon modelId={chip.model.modelId} className={cn('h-4 w-4 shrink-0', !included && 'opacity-50 grayscale')} />
+                      <span className="min-w-0 truncate">{name}</span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-40" strokeWidth={2} />
+                    </button>
+                  }
+                />
+              ) : (
+                <span className="flex h-11 min-w-0 flex-1 items-center gap-2 px-1.5 text-[14px] text-ink">
+                  <ModelIcon modelId={chip.model.modelId} className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 truncate">{name}</span>
+                </span>
+              )}
+              {chip.laneId ? (
+                <button
+                  type="button"
+                  onClick={() => onRemove(chip.laneId!)}
+                  aria-label={t(composer.remove, { name })}
+                  className="flex h-11 w-10 shrink-0 items-center justify-center rounded-[8px] text-ink-faint active:bg-surface-active"
+                >
+                  <X className="h-4 w-4" strokeWidth={1.75} />
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+        {full ? (
+          <p className="px-2 pb-1.5 pt-2 text-[12px] text-ink-faint">{t(composer.maxLanes, { max: MAX_LANES })}</p>
+        ) : lists.options.length || lists.restorable.length ? (
+          <>
+            <PopoverSeparator />
+            <CompareList {...compare} {...lists} onFull={() => undefined} />
           </>
         ) : null}
-        {options.length ? (
-          <PopoverLabel>{comparing ? t(composer.addAnotherModel) : t(composer.compareSideBySide)}</PopoverLabel>
-        ) : null}
-        {options.map((model) => (
-          <PopoverItem
-            key={`${model.providerId}:${model.modelId}`}
-            onSelect={() => {
-              onAdd({ providerId: model.providerId, modelId: model.modelId })
-              // Stays open: adding a model is not a completed interaction, and
-              // closing it made comparing three models a three-popover job.
-              if (lanes + 1 >= MAX_LANES) setOpen(false)
-            }}
-          >
-            <ModelIcon modelId={model.modelId} className="h-3.5 w-3.5 text-ink-muted" />
-            <span className="min-w-0 flex-1 truncate">{displayName(model.modelId)}</span>
-            <span className="shrink-0 text-[11px] text-ink-faint">{model.providerName}</span>
-          </PopoverItem>
-        ))}
       </PopoverContent>
     </Popover>
   )
@@ -1186,6 +1410,43 @@ function labelForMode(mode: SearchMode): string {
 }
 
 /**
+ * The depth this model reasons at, when it cannot be chosen, and why.
+ *
+ * A tooltip on a desktop. A finger cannot hover, so there the label is a
+ * button and the reason opens beside it, the way the adjustable control's
+ * menu does.
+ */
+function ReasoningNote({ note }: { note: string }) {
+  const t = useT()
+  const touch = useTouch()
+  const face = (
+    <span
+      className={cn(
+        'flex h-7 shrink-0 items-center gap-1 rounded-[7px] px-2',
+        'text-[12.5px] font-medium text-ink-faint',
+      )}
+    >
+      <Brain className="h-3.5 w-3.5" strokeWidth={1.75} />
+      <span>{t(composer.reasoningDefault)}</span>
+    </span>
+  )
+  if (!touch) return <Tooltip label={note}>{face}</Tooltip>
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label={t(composer.reasoningDepth)}>
+          {face}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="top" width={260}>
+        <PopoverLabel>{t(composer.reasoningDepth)}</PopoverLabel>
+        <p className="px-2 pb-2 text-[13px] leading-relaxed text-ink-soft">{note}</p>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
  * Reasoning depth control.
  *
  * Only the levels the model actually supports are listed, and the control hides
@@ -1284,7 +1545,12 @@ function LaneReasoningControl({
           )}
         >
           <Brain className="h-3.5 w-3.5" strokeWidth={1.75} />
-          {face ? <span className="whitespace-nowrap">{face}</span> : <span>{t(composer.reasoningDefault)}</span>}
+          {face ? (
+            // On a phone, three columns' levels (`中 · 高 · 低`) would push send off the row.
+            <span className="whitespace-nowrap max-md:max-w-[64px] max-md:truncate">{face}</span>
+          ) : (
+            <span>{t(composer.reasoningDefault)}</span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" side="top" width={340}>

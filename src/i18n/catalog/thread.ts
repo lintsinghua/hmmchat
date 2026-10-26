@@ -46,8 +46,8 @@ export const thread = {
   nextQuestionVersion: { en: 'Next version of this question', zh: '下一个提问版本' },
   forkHere: { en: 'Branch from here', zh: '从这里分支' },
   forkHereHint: {
-    en: 'Start a new chat with the context up to this point',
-    zh: '连同之前的上下文开一个新对话',
+    en: 'Start a new chat with everything up to this answer',
+    zh: '带着到这条回答为止的上下文开一个新对话',
   },
   editAndResend: { en: 'Edit and resend', zh: '编辑并重新发送' },
   editMessage: { en: 'Edit message', zh: '编辑消息' },

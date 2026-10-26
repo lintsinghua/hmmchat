@@ -8,6 +8,7 @@ import type { Entry } from '../core'
 export const composer = {
   // --- Text box ------------------------------------------------------------
   placeholder: { en: 'Ask something, or drop files here…', zh: '问点什么，或把文件拖进来…' },
+  placeholderTouch: { en: 'Ask something…', zh: '问点什么…' },
   placeholderTogether: {
     en: 'Ask something — {count} models will answer together…',
     zh: '问点什么，{count} 个模型一起回答…',
@@ -64,6 +65,10 @@ export const composer = {
   },
   compareTitle: { en: 'Compare models side by side', zh: '并排对比多个模型' },
   columns: { en: '{count} columns', zh: '{count} 列' },
+  modelsCount: { en: '{count} models', zh: '{count} 个模型' },
+  modelsAsked: { en: '{n}/{total} models', zh: '{n}/{total} 个模型' },
+  answeringModels: { en: 'Models answering', zh: '回答的模型' },
+  askAll: { en: 'Ask all', zh: '全部都问' },
   compare: { en: 'Compare', zh: '对比' },
   removed: { en: 'Removed', zh: '已移除' },
   answeredRounds: { en: '{count} rounds answered', zh: '{count} 轮回答' },

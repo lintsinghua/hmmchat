@@ -9,7 +9,7 @@ import * as db from '@/lib/db'
 import { cn } from '@/lib/cn'
 import { displayName } from '@/providers/registry'
 import { Button } from '@/components/ui/Button'
-import { Dialog, DialogContent, DialogHiddenTitle } from '@/components/ui/Dialog'
+import { Dialog, DialogContent, DialogHiddenTitle, DIALOG_CLOSE_GUTTER } from '@/components/ui/Dialog'
 import { ModelIcon } from '@/components/icons/BrandIcon'
 import { useT } from '@/i18n/core'
 import { composer } from '@/i18n'
@@ -61,8 +61,8 @@ export function ReferencePicker({
             onClose={onClose}
           />
         ) : (
-          <Command loop className="flex flex-col">
-            <div className="flex items-center gap-2 border-b border-line px-3.5 py-3">
+          <Command loop className="flex flex-col max-md:min-h-0 max-md:flex-1">
+            <div className={cn('flex items-center gap-2 border-b border-line px-3.5 py-3', DIALOG_CLOSE_GUTTER)}>
               <MessageSquareQuote className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={1.75} />
               <Command.Input
                 autoFocus
@@ -70,7 +70,7 @@ export function ReferencePicker({
                 className="min-w-0 flex-1 text-[14px] text-ink placeholder:text-ink-faint"
               />
             </div>
-            <Command.List className="max-h-[380px] overflow-y-auto p-1.5">
+            <Command.List className="max-h-[380px] overflow-y-auto p-1.5 max-md:max-h-none max-md:flex-1">
               <Command.Empty className="px-3 py-6 text-center text-[13px] text-ink-muted">
                 {candidates.length ? t(composer.noMatchingChats) : t(composer.noOtherChats)}
               </Command.Empty>
@@ -157,8 +157,8 @@ function RoundPicker({
     setPicked((current) => (current.includes(turnId) ? current.filter((id) => id !== turnId) : [...current, turnId]))
 
   return (
-    <div className="flex max-h-[min(640px,calc(100vh-120px))] flex-col">
-      <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+    <div className="flex max-h-[min(640px,calc(100vh-120px))] flex-col max-md:max-h-none max-md:min-h-0 max-md:flex-1">
+      <div className={cn('flex items-center gap-2 border-b border-line px-3 py-2.5', DIALOG_CLOSE_GUTTER)}>
         {onBack ? (
           <Button size="icon-sm" onClick={onBack} aria-label={t(composer.backToChatList)}>
             <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
