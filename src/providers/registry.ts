@@ -311,12 +311,19 @@ export function createNativeSearch(
  */
 export function capabilitiesFor(config: ProviderConfig, modelId: string): Capabilities {
   if (config.kind !== 'openai-compatible') {
-    return { ...inferForProvider(config.kind, modelId), nativeSearch: nativeSearchRoute(config, modelId) !== null }
+    const inferred = inferForProvider(config.kind, modelId)
+    return {
+      ...inferred,
+      nativeSearch: nativeSearchRoute(config, modelId) !== null,
+      // Only the native Gemini protocol carries an audio file part.
+      audio: inferred.audio && config.kind === 'google',
+    }
   }
 
   const known = inferCapabilities(modelId)
   return {
     ...known,
+    audio: false,
     // Depth is inferred from the model id, like vision and search, and the
     // provider's own setting overrides it. Flattening this to 'none' was wrong
     // for the case that matters most: a gateway relaying Claude and GPT does

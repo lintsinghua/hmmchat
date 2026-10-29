@@ -249,6 +249,7 @@ async function runLane(
           // text to be the whole document.
           maxAttachmentChars: capabilities.vision ? 40_000 : 200_000,
           vision: capabilities.vision,
+          audio: capabilities.audio,
         }),
       ),
       tools,

@@ -58,6 +58,8 @@ export interface Capabilities {
   vision: boolean
   /** The model accepts PDF documents as input. */
   pdf: boolean
+  /** The model accepts audio files (mp3, wav, …) as input. */
+  audio: boolean
 }
 
 const NONE: Capabilities = {
@@ -67,7 +69,14 @@ const NONE: Capabilities = {
   nativeSearch: false,
   vision: false,
   pdf: false,
+  audio: false,
 }
+
+/**
+ * Audio input, which the models.dev catalog does not carry. Every Gemini chat
+ * model takes it; the TTS, image, embedding and Live variants do not.
+ */
+const AUDIO_INPUT = /^gemini-(?!.*(tts|image|embedding|live))/
 
 /**
  * Capabilities for an id the catalog does not know.
@@ -226,7 +235,11 @@ export function inferCapabilities(modelId: string): Capabilities {
   if (!entry) {
     // Nothing in the catalog: the family rules are the whole answer.
     const capabilities = { ...NONE, ...family }
-    return { ...capabilities, nativeSearch: capabilities.tools && HOSTED_SEARCH.test(id) }
+    return {
+      ...capabilities,
+      nativeSearch: capabilities.tools && HOSTED_SEARCH.test(id),
+      audio: AUDIO_INPUT.test(id),
+    }
   }
 
   const reasoning = fromCatalog(id)
@@ -239,6 +252,7 @@ export function inferCapabilities(modelId: string): Capabilities {
     nativeSearch: flags.includes('t') && HOSTED_SEARCH.test(id),
     vision: flags.includes('i'),
     pdf: flags.includes('p'),
+    audio: AUDIO_INPUT.test(id),
   }
 }
 

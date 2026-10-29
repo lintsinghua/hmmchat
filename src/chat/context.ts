@@ -1,7 +1,7 @@
 import type { FilePart, ImagePart, ModelMessage, TextPart } from 'ai'
 import { t } from '@/i18n/core'
 import { chat } from '@/i18n'
-import { isImage } from '@/lib/attachments'
+import { isAudio, isImage } from '@/lib/attachments'
 import {
   activePath,
   laneSkipped,
@@ -43,6 +43,8 @@ export function buildMessages(
      */
     vision?: boolean
     pdf?: boolean
+    /** Whether audio files may travel as file parts; there is no text fallback. */
+    audio?: boolean
   } = {},
 ): ModelMessage[] {
   const messages: ModelMessage[] = []
@@ -58,6 +60,7 @@ export function buildMessages(
       content: userContent(turn.text, turn.attachments, {
         maxChars: options.maxAttachmentChars,
         vision: options.vision,
+        audio: options.audio,
       }),
     })
 
@@ -91,7 +94,7 @@ export function buildMessages(
 export function userContent(
   text: string,
   attachments: Attachment[] | undefined,
-  options: { maxChars?: number; vision?: boolean } = {},
+  options: { maxChars?: number; vision?: boolean; audio?: boolean } = {},
 ): string | Array<TextPart | ImagePart | FilePart> {
   const maxChars = options.maxChars ?? 120_000
   // Without the matching capability there is no point sending the bytes: the
@@ -114,13 +117,14 @@ export function userContent(
    * models that cannot read a PDF, which is why the capability gates the *how*
    * everywhere else but not here.
    */
-  const parts: ImagePart[] = []
-  if (vision) {
-    for (const file of files) {
-      if (!file.dataUrl) continue
-      if (isImage(file.ext)) {
-        parts.push({ type: 'image', image: file.dataUrl, mediaType: file.mime })
-      }
+  const parts: Array<ImagePart | FilePart> = []
+  for (const file of files) {
+    if (!file.dataUrl) continue
+    if (vision && isImage(file.ext)) {
+      parts.push({ type: 'image', image: file.dataUrl, mediaType: file.mime })
+    } else if (options.audio && isAudio(file.ext)) {
+      const base64 = file.dataUrl.slice(file.dataUrl.indexOf(',') + 1)
+      parts.push({ type: 'file', data: base64, mediaType: file.mime, filename: file.name })
     }
   }
 

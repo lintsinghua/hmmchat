@@ -313,6 +313,22 @@ describe('userContent', () => {
     const parts = userContent('看这个', [image], { vision: true }) as Array<{ type: string }>
     expect(parts.map((part) => part.type)).toEqual(['text', 'image'])
   })
+
+  it('sends audio as a file part only when the model can hear', () => {
+    const audio = {
+      id: 'a-3',
+      name: 'memo.mp3',
+      ext: 'mp3',
+      mime: 'audio/mp3',
+      bytes: 10,
+      dataUrl: 'data:audio/mp3;base64,AAAA',
+    }
+
+    expect(typeof userContent('转写', [audio], { vision: true })).toBe('string')
+
+    const parts = userContent('转写', [audio], { audio: true }) as unknown[]
+    expect(parts[1]).toMatchObject({ type: 'file', data: 'AAAA', mediaType: 'audio/mp3' })
+  })
 })
 
 describe('systemPrompt', () => {

@@ -54,6 +54,9 @@ describe('inferCapabilities', () => {
   it('treats a Gemini newer than the catalog as reasoning by level', () => {
     expect(inferCapabilities('gemini-4-argon').thinking).toBe('level')
     expect(inferCapabilities('google/gemini-4-argon').thinking).toBe('level')
+    expect(inferCapabilities('gemini-4-argon').audio).toBe(true)
+    expect(inferCapabilities('gemini-3.1-flash-tts-preview').audio).toBe(false)
+    expect(inferCapabilities('claude-opus-5-5').audio).toBe(false)
   })
 
   it('takes a no-reasoning row at its word', () => {

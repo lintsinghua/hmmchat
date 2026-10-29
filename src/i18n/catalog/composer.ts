@@ -56,6 +56,7 @@ export const composer = {
   rounds: { en: '{count} rounds', zh: '{count} 轮' },
   characters: { en: '{count} chars', zh: '{count} 字' },
   imageNotVisible: { en: "This model can't see images", zh: '当前模型看不到图片' },
+  audioNotSupported: { en: "This model can't hear audio", zh: '当前模型无法读取音频' },
 
   // --- Compare -------------------------------------------------------------
   maxLanes: { en: 'Up to {max} models side by side', zh: '最多 {max} 个模型并排' },

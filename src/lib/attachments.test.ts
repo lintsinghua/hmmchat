@@ -42,6 +42,12 @@ describe('extension handling', () => {
     expect(hasNativeInput('png', { vision: false, pdf: true })).toBe(false)
     expect(hasNativeInput('png', { vision: false, pdf: false })).toBe(false)
   })
+
+  it('accepts audio only on a model that can hear it', () => {
+    expect(isSupported('meeting.mp3')).toBe(true)
+    expect(hasNativeInput('mp3', { vision: true, pdf: true, audio: true })).toBe(true)
+    expect(hasNativeInput('mp3', { vision: true, pdf: true })).toBe(false)
+  })
 })
 
 describe('limitsFor', () => {

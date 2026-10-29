@@ -33,10 +33,27 @@ const TEXT_EXTENSIONS = new Set([
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif'])
 
+const AUDIO_MIME: Record<string, string> = {
+  mp3: 'audio/mp3',
+  wav: 'audio/wav',
+  m4a: 'audio/m4a',
+  aac: 'audio/aac',
+  ogg: 'audio/ogg',
+  opus: 'audio/opus',
+  flac: 'audio/flac',
+  webm: 'audio/webm',
+  aiff: 'audio/aiff',
+}
+
 /** Per-file prompt budget; a big file is truncated with a note rather than dropped. */
 const MAX_TEXT_CHARS = 120_000
 /** Whole-file read cap. Beyond this the browser's own decode is not worth the wait. */
 const MAX_FILE_BYTES = 32 * 1024 * 1024
+/**
+ * Audio travels inline, and Gemini caps an inline request at 20 MB after base64
+ * (which inflates by a third), so the raw file has to stay well under that.
+ */
+const MAX_AUDIO_BYTES = 14 * 1024 * 1024
 
 export interface AttachmentLimits {
   /** Whether an image/PDF may be sent as a file part. */
@@ -65,6 +82,10 @@ export function isPdf(ext: string): boolean {
   return ext === 'pdf'
 }
 
+export function isAudio(ext: string): boolean {
+  return ext in AUDIO_MIME
+}
+
 export function isOffice(ext: string): boolean {
   return ext === 'docx' || ext === 'xlsx' || ext === 'pptx'
 }
@@ -76,7 +97,7 @@ export function isText(ext: string): boolean {
 /** Whether a picker entry is worth accepting at all. */
 export function isSupported(name: string): boolean {
   const ext = extensionOf(name)
-  return isText(ext) || isImage(ext) || isPdf(ext) || isOffice(ext)
+  return isText(ext) || isImage(ext) || isPdf(ext) || isOffice(ext) || isAudio(ext)
 }
 
 /**
@@ -91,9 +112,13 @@ export function isSupported(name: string): boolean {
  * of them would be rejected upstream. Sending the extracted text instead is
  * always a valid fallback, which is why this only decides *how* the file travels.
  */
-export function hasNativeInput(ext: string, input: { vision: boolean; pdf: boolean }): boolean {
+export function hasNativeInput(
+  ext: string,
+  input: { vision: boolean; pdf: boolean; audio?: boolean },
+): boolean {
   if (isImage(ext)) return input.vision
   if (isPdf(ext)) return input.pdf
+  if (isAudio(ext)) return input.audio ?? false
   return false
 }
 
@@ -117,8 +142,18 @@ export async function readAttachment(file: File): Promise<Attachment> {
   if (file.size > MAX_FILE_BYTES) {
     return { ...base, note: t(composer.fileTooLarge, { size: formatBytes(MAX_FILE_BYTES) }) }
   }
+  if (isAudio(ext) && file.size > MAX_AUDIO_BYTES) {
+    return { ...base, note: t(composer.fileTooLarge, { size: formatBytes(MAX_AUDIO_BYTES) }) }
+  }
 
   try {
+    if (isAudio(ext)) {
+      // The picker's MIME for audio varies by OS (`audio/x-m4a`, `audio/mpeg`);
+      // the extension's is one Gemini is documented to accept.
+      const mime = AUDIO_MIME[ext]
+      return { ...base, mime, dataUrl: `data:${mime};base64,${toBase64(await file.arrayBuffer())}` }
+    }
+
     if (isImage(ext)) {
       const dataUrl = await readAsDataUrl(file)
       return {

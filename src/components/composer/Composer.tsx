@@ -58,6 +58,7 @@ import { ModelPicker, useAvailableModels } from '@/components/model/ModelPicker'
 import {
   formatBytes,
   hasNativeInput,
+  isAudio as isAudioExt,
   isImage as isImageExt,
   isSupported,
   readAttachment,
@@ -191,6 +192,7 @@ export function Composer({
           nativeSearch: false,
           vision: false,
           pdf: false,
+          audio: false,
         }
 
   // The levels come from the model's own accepted values, not its provider, and
@@ -858,7 +860,7 @@ export function Composer({
           type="file"
           multiple
           hidden
-          accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.heic,.pdf,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.yaml,.yml,.toml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.kt,.swift,.c,.h,.cpp,.hpp,.cs,.php,.sh,.sql,.docx,.xlsx,.pptx"
+          accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.heic,.pdf,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.yaml,.yml,.toml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.kt,.swift,.c,.h,.cpp,.hpp,.cs,.php,.sh,.sql,.docx,.xlsx,.pptx,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.webm,.aiff"
           onChange={(event) => {
             const files = event.target.files
             if (files?.length) void addFiles(files)
@@ -923,17 +925,18 @@ function AttachmentChip({ file, onRemove }: { file: Attachment; onRemove: () => 
   // Images and PDFs are gated separately: the catalog has models that read one
   // and not the other, and the chip should say which it is.
   const input = useMemo(() => {
-    if (!target) return { vision: false, pdf: false }
+    if (!target) return { vision: false, pdf: false, audio: false }
     const provider = providers.find((entry) => entry.id === target.providerId)
-    if (!provider) return { vision: false, pdf: false }
+    if (!provider) return { vision: false, pdf: false, audio: false }
     const capabilities = capabilitiesFor(provider, target.modelId)
-    return { vision: capabilities.vision, pdf: capabilities.pdf }
+    return { vision: capabilities.vision, pdf: capabilities.pdf, audio: capabilities.audio }
   }, [providers, target])
 
   // Only images need the model to be able to see them; a PDF always travels as
   // the text extracted on this machine, so it is readable everywhere.
   const isImage = isImageExt(file.ext)
-  const readable = !isImage || hasNativeInput(file.ext, input)
+  const isAudio = isAudioExt(file.ext)
+  const readable = !(isImage || isAudio) || hasNativeInput(file.ext, input)
   const reference = file.reference
   const detail =
     file.note ??
@@ -946,7 +949,7 @@ function AttachmentChip({ file, onRemove }: { file: Attachment; onRemove: () => 
           .filter(Boolean)
           .join(' · ')
       : !readable
-        ? t(composer.imageNotVisible)
+        ? t(isAudio ? composer.audioNotSupported : composer.imageNotVisible)
         : file.text
           ? `${formatBytes(file.bytes)} · ${t(composer.characters, { count: file.text.length.toLocaleString() })}`
           : formatBytes(file.bytes))
